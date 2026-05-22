@@ -55,7 +55,7 @@ async function fetchGitHubBotTree(): Promise<string[]> {
     const data = await res.json() as { tree?: Array<{ type: string; path: string }> };
     if (!data.tree) return [];
     return data.tree
-      .filter((f) => f.type === "tree" && f.path.startsWith("bots/") && !f.path.includes("/"))
+      .filter((f) => f.type === "tree" && f.path.startsWith("bots/") && f.path.split("/").length === 2)
       .map((f) => f.path.replace("bots/", ""));
   } catch (err) {
     logger.error({ err }, "Failed to fetch GitHub bot tree");
