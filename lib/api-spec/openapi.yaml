@@ -76,6 +76,31 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
 
+  /bots/{name}/run:
+    post:
+      operationId: runBot
+      tags: [bots]
+      summary: Trigger a manual run of a bot (records heartbeat + invocation)
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Bot run recorded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BotRunResult"
+        "404":
+          description: Bot not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
   /github/repos:
     get:
       operationId: listRepos
@@ -558,6 +583,23 @@ components:
         detail:
           type: object
           additionalProperties: true
+
+    BotRunResult:
+      type: object
+      required: [ok, name, status, invocations, lastHeartbeat]
+      properties:
+        ok:
+          type: boolean
+        name:
+          type: string
+        status:
+          type: string
+        invocations:
+          type: integer
+        lastHeartbeat:
+          type: string
+        message:
+          type: string
 
     CopilotPr:
       type: object

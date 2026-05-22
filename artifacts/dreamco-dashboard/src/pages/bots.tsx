@@ -1,20 +1,38 @@
 import { useState } from "react";
-import { useListBots, getListBotsQueryKey } from "@workspace/api-client-react";
+import { useQueryClient } from "@tanstack/react-query";
+import {
+  useListBots,
+  getListBotsQueryKey,
+  useRunBot,
+} from "@workspace/api-client-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Search, Bot, GitPullRequest, DollarSign, Activity } from "lucide-react";
+import { Search, Bot, GitPullRequest, DollarSign, FileCheck2, Play, Check } from "lucide-react";
 
 export default function Bots() {
   const [search, setSearch] = useState("");
   const [tierFilter, setTierFilter] = useState<string>("ALL");
   const [statusFilter, setStatusFilter] = useState<string>("ALL");
+  const [justRan, setJustRan] = useState<Record<string, number>>({});
 
+  const queryClient = useQueryClient();
   const { data: bots, isLoading } = useListBots({
     query: { queryKey: getListBotsQueryKey() }
   });
+  const runBot = useRunBot({
+    mutation: {
+      onSuccess: (_data, vars) => {
+        setJustRan((m) => ({ ...m, [vars.name]: Date.now() }));
+        queryClient.invalidateQueries({ queryKey: getListBotsQueryKey() });
+      },
+    },
+  });
+
+  const manifestCount = bots?.filter(b => b.source === "manifest").length ?? 0;
 
   const filteredBots = bots?.filter(bot => {
     const matchesSearch = bot.name.toLowerCase().includes(search.toLowerCase()) || 
@@ -51,7 +69,7 @@ export default function Bots() {
           Bot_Registry
         </h1>
         <p className="text-muted-foreground font-mono text-sm uppercase tracking-wider">
-          Total Fleet: {bots?.length || 0} // Active: {bots?.filter(b => b.status === 'active').length || 0}
+          Total Fleet: {bots?.length || 0} // Active: {bots?.filter(b => b.status === 'active').length || 0} // Manifest-Backed: {manifestCount}
         </p>
       </div>
 
@@ -104,11 +122,16 @@ export default function Bots() {
               <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-primary/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
               <CardContent className="p-5">
                 <div className="flex justify-between items-start mb-4">
-                  <div>
-                    <h3 className="font-mono font-bold text-lg text-foreground truncate max-w-[180px]">{bot.name}</h3>
-                    <p className="font-mono text-xs text-muted-foreground uppercase">{bot.category}</p>
+                  <div className="min-w-0">
+                    <h3 className="font-mono font-bold text-lg text-foreground truncate max-w-[180px]">{bot.displayName || bot.name}</h3>
+                    <p className="font-mono text-xs text-muted-foreground uppercase truncate">{bot.category}{bot.division ? ` // ${bot.division}` : ""}</p>
                   </div>
                   <div className="flex items-center gap-2">
+                    {bot.source === "manifest" && (
+                      <div className="flex items-center gap-1 bg-primary/10 px-1.5 py-1 rounded-md border border-primary/30" title="Backed by bot.manifest.json">
+                        <FileCheck2 className="h-3 w-3 text-primary" />
+                      </div>
+                    )}
                     <div className="flex items-center gap-1.5 bg-background/50 px-2 py-1 rounded-md border border-border/40">
                       <div className={`h-2 w-2 rounded-full ${getStatusColor(bot.status)} ${bot.status === 'active' ? 'animate-pulse' : ''}`} />
                       <span className="font-mono text-[10px] uppercase text-muted-foreground">{bot.status}</span>
@@ -131,6 +154,24 @@ export default function Bots() {
                       <span className="font-mono text-xs">{bot.pendingPRs || 0}</span>
                     </div>
                   </div>
+                </div>
+
+                <div className="mt-4 pt-4 border-t border-border/40">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="w-full font-mono text-xs uppercase tracking-wider border-primary/30 hover:border-primary hover:bg-primary/10"
+                    disabled={runBot.isPending && runBot.variables?.name === bot.name}
+                    onClick={() => runBot.mutate({ name: bot.name })}
+                  >
+                    {justRan[bot.name] && Date.now() - justRan[bot.name]! < 4000 ? (
+                      <><Check className="h-3 w-3 mr-1.5 text-primary" />Ran</>
+                    ) : runBot.isPending && runBot.variables?.name === bot.name ? (
+                      <>Running…</>
+                    ) : (
+                      <><Play className="h-3 w-3 mr-1.5" />Run</>
+                    )}
+                  </Button>
                 </div>
               </CardContent>
             </Card>

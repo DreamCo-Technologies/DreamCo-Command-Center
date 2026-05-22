@@ -1,11 +1,13 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import {
-  useListBots, getListBotsQueryKey,
+  useListBots, getListBotsQueryKey, useRunBot,
 } from "@workspace/api-client-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
-import { Building2, Bot, TrendingUp, Layers, Activity } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Building2, Bot, TrendingUp, Layers, Activity, Play, Check } from "lucide-react";
 
 type Division = {
   slug: string;
@@ -73,17 +75,32 @@ const statusColors: Record<string, string> = {
 };
 
 export default function Divisions() {
+  const [justRan, setJustRan] = useState<Record<string, number>>({});
+  const queryClient = useQueryClient();
   const { data: bots, isLoading } = useListBots({
     query: { queryKey: getListBotsQueryKey() },
+  });
+  const runBot = useRunBot({
+    mutation: {
+      onSuccess: (_d, vars) => {
+        setJustRan((m) => ({ ...m, [vars.name]: Date.now() }));
+        queryClient.invalidateQueries({ queryKey: getListBotsQueryKey() });
+      },
+    },
   });
 
   const divisionData = useMemo(() => {
     const all = bots || [];
     return DIVISIONS.map((div) => {
-      const divBots = all.filter((b) => div.categories.includes(b.category));
+      const divBots = all.filter((b) =>
+        b.division
+          ? b.division === div.name
+          : div.categories.includes(b.category),
+      );
       const revenue = divBots.reduce((s, b) => s + (b.revenue || 0), 0);
       const active = divBots.filter((b) => b.status === "active").length;
-      return { ...div, bots: divBots, revenue, active };
+      const manifestBacked = divBots.filter((b) => b.source === "manifest").length;
+      return { ...div, bots: divBots, revenue, active, manifestBacked };
     });
   }, [bots]);
 
@@ -143,6 +160,9 @@ export default function Divisions() {
               </div>
             </CardHeader>
             <CardContent>
+              <div className="mb-3 text-[10px] font-mono uppercase tracking-wider text-muted-foreground">
+                Manifest-Backed: {div.manifestBacked} / {div.bots.length}
+              </div>
               <div className="grid grid-cols-3 gap-3 mb-4">
                 <div className="rounded-md border border-border/40 bg-background/50 p-3">
                   <p className="text-xs font-mono text-muted-foreground uppercase">Bots</p>
@@ -170,15 +190,28 @@ export default function Divisions() {
                 ) : div.bots.length === 0 ? (
                   <p className="text-xs font-mono text-muted-foreground text-center py-4">No bots assigned</p>
                 ) : (
-                  div.bots.slice(0, 8).map((bot) => (
-                    <div key={bot.name} className="flex items-center justify-between px-3 py-2 rounded-md border border-border/40 bg-background/30 text-xs font-mono">
-                      <div className="flex items-center gap-2 min-w-0">
-                        <div className={`h-1.5 w-1.5 rounded-full shrink-0 ${statusColors[bot.status] || "bg-muted"} ${bot.status === "active" ? "animate-pulse" : ""}`} />
-                        <span className="text-foreground truncate">{bot.name}</span>
+                  div.bots.slice(0, 8).map((bot) => {
+                    const ran = justRan[bot.name] && Date.now() - justRan[bot.name]! < 4000;
+                    const isRunning = runBot.isPending && runBot.variables?.name === bot.name;
+                    return (
+                      <div key={bot.name} className="flex items-center justify-between gap-2 px-3 py-2 rounded-md border border-border/40 bg-background/30 text-xs font-mono">
+                        <div className="flex items-center gap-2 min-w-0 flex-1">
+                          <div className={`h-1.5 w-1.5 rounded-full shrink-0 ${statusColors[bot.status] || "bg-muted"} ${bot.status === "active" ? "animate-pulse" : ""}`} />
+                          <span className="text-foreground truncate">{bot.name}</span>
+                        </div>
+                        <Badge variant="outline" className={`text-[10px] uppercase ${tierColors[bot.tier] ?? tierColors.FREE}`}>{bot.tier}</Badge>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-6 px-2 font-mono text-[10px] uppercase hover:bg-primary/10 hover:text-primary"
+                          disabled={isRunning}
+                          onClick={() => runBot.mutate({ name: bot.name })}
+                        >
+                          {ran ? <Check className="h-3 w-3 text-primary" /> : isRunning ? "…" : <Play className="h-3 w-3" />}
+                        </Button>
                       </div>
-                      <Badge variant="outline" className={`text-[10px] uppercase ${tierColors[bot.tier] ?? tierColors.FREE}`}>{bot.tier}</Badge>
-                    </div>
-                  ))
+                    );
+                  })
                 )}
                 {div.bots.length > 8 && (
                   <p className="text-xs font-mono text-muted-foreground text-center pt-2">+ {div.bots.length - 8} more</p>
