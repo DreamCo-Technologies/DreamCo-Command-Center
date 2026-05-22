@@ -2,12 +2,13 @@ import { useState } from "react";
 import { 
   useGetDashboardSummary, getGetDashboardSummaryQueryKey,
   useListBots, getListBotsQueryKey,
-  useListCommits, getListCommitsQueryKey
+  useListCommits, getListCommitsQueryKey,
+  useGetBuildProgress, getGetBuildProgressQueryKey
 } from "@workspace/api-client-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Bot, GitCommit, DollarSign, Activity, Zap, Server } from "lucide-react";
+import { Bot, GitCommit, DollarSign, Activity, Zap, Server, Gauge } from "lucide-react";
 import { Link } from "wouter";
 
 export default function Dashboard() {
@@ -21,6 +22,10 @@ export default function Dashboard() {
   
   const { data: commits, isLoading: isLoadingCommits } = useListCommits({ 
     query: { queryKey: getListCommitsQueryKey() } 
+  });
+
+  const { data: build, isLoading: isLoadingBuild } = useGetBuildProgress({
+    query: { queryKey: getGetBuildProgressQueryKey() }
   });
 
   const getProgressColor = (percent: number) => {
@@ -146,6 +151,54 @@ export default function Dashboard() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Build Progress */}
+      <Card className="border-border/40 bg-card/50 backdrop-blur">
+        <CardHeader>
+          <CardTitle className="font-mono text-lg uppercase flex items-center gap-2">
+            <Gauge className="h-5 w-5 text-primary" />
+            System_Build_Progress
+            {!isLoadingBuild && build && (
+              <span className="ml-auto text-3xl font-bold text-primary tabular-nums">
+                {build.overallPercent}%
+              </span>
+            )}
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {isLoadingBuild ? (
+            <div className="space-y-3">
+              {[1, 2, 3, 4, 5, 6].map(i => <Skeleton key={i} className="h-10 w-full" />)}
+            </div>
+          ) : (
+            <>
+              <Progress
+                value={build?.overallPercent ?? 0}
+                className="h-2 bg-muted/50"
+                indicatorClassName={getProgressColor(build?.overallPercent ?? 0)}
+              />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-3 pt-2">
+                {build?.sections.map((s) => {
+                  const pct = s.total > 0 ? Math.round((s.done / s.total) * 100) : 0;
+                  return (
+                    <div key={s.name} className="space-y-1">
+                      <div className="flex justify-between font-mono text-xs">
+                        <span className="text-muted-foreground uppercase tracking-wider">{s.name}</span>
+                        <span className="text-foreground tabular-nums">{s.done} / {s.total}</span>
+                      </div>
+                      <Progress
+                        value={pct}
+                        className="h-1.5 bg-muted/40"
+                        indicatorClassName={getProgressColor(pct)}
+                      />
+                    </div>
+                  );
+                })}
+              </div>
+            </>
+          )}
+        </CardContent>
+      </Card>
 
       {/* GitHub Activity */}
       <Card className="border-border/40 bg-card/50 backdrop-blur">

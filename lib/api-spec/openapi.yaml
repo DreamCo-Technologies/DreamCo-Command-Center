@@ -19,6 +19,8 @@ tags:
     description: BuddyBot AI chatbot
   - name: dashboard
     description: Dashboard summary
+  - name: copilot
+    description: Copilot PR collaboration
 
 paths:
   /healthz:
@@ -194,6 +196,46 @@ paths:
                 items:
                   $ref: "#/components/schemas/ChatMessage"
 
+  /copilot/prs:
+    get:
+      operationId: listCopilotPrs
+      tags: [copilot]
+      summary: List open Copilot PRs across Dreamcobots with contract compliance
+      responses:
+        "200":
+          description: Open Copilot PRs
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CopilotPr"
+
+  /copilot/rewrite/{prNumber}:
+    post:
+      operationId: requestCopilotRewrite
+      tags: [copilot]
+      summary: Ask Copilot to rewrite a PR to fit the bot contract
+      parameters:
+        - name: prNumber
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Rewrite issue created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CopilotRewriteResponse"
+        "404":
+          description: PR not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
   /dashboard/summary:
     get:
       operationId: getDashboardSummary
@@ -206,6 +248,19 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/DashboardSummary"
+
+  /dashboard/build-progress:
+    get:
+      operationId: getBuildProgress
+      tags: [dashboard]
+      summary: Aggregated build completion across the system
+      responses:
+        "200":
+          description: Build progress sections + overall percent
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BuildProgress"
 
   /dashboard/tiers:
     get:
@@ -240,10 +295,12 @@ components:
 
     Bot:
       type: object
-      required: [name, status, tier, category]
+      required: [name, status, tier, category, source]
       properties:
         name:
           type: string
+        displayName:
+          type: ["string", "null"]
         repoPath:
           type: string
         status:
@@ -254,6 +311,19 @@ components:
           enum: [FREE, PRO, ENTERPRISE]
         category:
           type: string
+        division:
+          type: ["string", "null"]
+          description: Division slug from bot.manifest.json (e.g. DreamFinance)
+        capabilities:
+          type: array
+          items:
+            type: string
+        entrypoint:
+          type: ["string", "null"]
+        revenueModel:
+          type: ["string", "null"]
+        owner:
+          type: ["string", "null"]
         description:
           type: string
         lastHeartbeat:
@@ -264,6 +334,10 @@ components:
           type: number
         lastUpdate:
           type: ["string", "null"]
+        source:
+          type: string
+          enum: [manifest, heuristic, fallback]
+          description: Where this bot's metadata came from
 
     Repo:
       type: object
@@ -459,6 +533,70 @@ components:
           type: number
         profitTargetMonthly:
           type: number
+
+    BuildProgressSection:
+      type: object
+      required: [name, done, total]
+      properties:
+        name:
+          type: string
+        done:
+          type: integer
+        total:
+          type: integer
+
+    BuildProgress:
+      type: object
+      required: [overallPercent, sections]
+      properties:
+        overallPercent:
+          type: integer
+        sections:
+          type: array
+          items:
+            $ref: "#/components/schemas/BuildProgressSection"
+        detail:
+          type: object
+          additionalProperties: true
+
+    CopilotPr:
+      type: object
+      required: [number, title, url, author, createdAt, mergeable, contractCompliant, touchedDirs]
+      properties:
+        number:
+          type: integer
+        title:
+          type: string
+        url:
+          type: string
+        author:
+          type: string
+        createdAt:
+          type: string
+        mergeable:
+          type: ["boolean", "null"]
+        mergeableState:
+          type: ["string", "null"]
+        contractCompliant:
+          type: boolean
+          description: True when PR touches exactly one bots/* dir with a valid manifest
+        complianceReason:
+          type: string
+        touchedDirs:
+          type: array
+          items:
+            type: string
+        manifestPresent:
+          type: boolean
+
+    CopilotRewriteResponse:
+      type: object
+      required: [issueNumber, issueUrl]
+      properties:
+        issueNumber:
+          type: integer
+        issueUrl:
+          type: string
 
     Tier:
       type: object
