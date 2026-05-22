@@ -139,6 +139,21 @@ export default function Bots() {
                   </div>
                 </div>
 
+                {bot.capabilities && bot.capabilities.length > 0 && (
+                  <div className="mt-3 flex flex-wrap gap-1">
+                    {bot.capabilities.slice(0, 4).map((cap) => (
+                      <span key={cap} className="text-[9px] font-mono uppercase tracking-wider px-1.5 py-0.5 rounded border border-primary/20 bg-primary/5 text-primary/80">
+                        {cap.replace(/_/g, " ")}
+                      </span>
+                    ))}
+                    {bot.capabilities.length > 4 && (
+                      <span className="text-[9px] font-mono uppercase tracking-wider px-1.5 py-0.5 text-muted-foreground">
+                        +{bot.capabilities.length - 4}
+                      </span>
+                    )}
+                  </div>
+                )}
+
                 <div className="flex justify-between items-center mt-6">
                   <Badge variant="outline" className={`font-mono text-[10px] uppercase rounded-sm border ${getTierColor(bot.tier)}`}>
                     {bot.tier}

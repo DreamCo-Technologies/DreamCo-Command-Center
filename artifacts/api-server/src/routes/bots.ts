@@ -47,6 +47,30 @@ const BOT_CATEGORIES: Record<string, string> = {
   dream_finance: "Finance",
 };
 
+const CATEGORY_CAPABILITIES: Record<string, string[]> = {
+  "AI Companion": ["chat", "memory_recall", "emotion_detection", "intent_routing", "knowledge_lookup", "task_planning"],
+  "AI Research": ["model_evaluation", "research_synthesis", "experiment_tracking", "data_ingestion", "reasoning"],
+  "Automation": ["task_scheduling", "workflow_execution", "retries", "logging", "webhook_triggers"],
+  "Billing": ["invoice_generation", "usage_metering", "subscription_lifecycle", "dunning", "stripe_sync"],
+  "Core": ["bot_orchestration", "permission_management", "audit_logging", "event_bus", "system_health"],
+  "Data": ["sql_query", "schema_introspection", "data_export", "etl_pipeline", "anomaly_detection"],
+  "E-Commerce": ["product_sync", "order_fulfillment", "inventory_management", "shopify_api", "checkout_automation"],
+  "Education": ["lesson_generation", "quiz_creation", "grading", "progress_tracking", "curriculum_sync"],
+  "Finance": ["market_data_fetch", "portfolio_analysis", "risk_scoring", "trade_execution", "reporting"],
+  "Government": ["grant_discovery", "contract_search", "compliance_check", "filing_automation", "deadline_alerts"],
+  "Health": ["symptom_lookup", "appointment_scheduling", "telemetry_sync", "regimen_tracking", "alerts"],
+  "Infrastructure": ["service_discovery", "load_balancing", "deployment_orchestration", "monitoring", "scaling"],
+  "Lead Generation": ["lead_scraping", "enrichment", "lead_scoring", "outreach_sequencing", "crm_sync"],
+  "Legal": ["contract_review", "clause_extraction", "compliance_search", "filing_automation", "citation_lookup"],
+  "Marketing": ["content_generation", "campaign_scheduling", "audience_segmentation", "analytics", "social_publishing"],
+  "Media": ["voice_synthesis", "transcription", "video_editing", "image_generation", "asset_management"],
+  "Payments": ["charge_processing", "refunds", "webhook_handling", "key_rotation", "fraud_signals"],
+  "Real Estate": ["mls_search", "valuation", "foreclosure_detection", "rental_cashflow", "lead_capture"],
+  "SaaS": ["tenant_provisioning", "feature_flagging", "billing_sync", "usage_tracking", "support_routing"],
+  "Sales": ["pipeline_management", "proposal_generation", "follow_up_sequencing", "deal_scoring", "crm_sync"],
+  "Software": ["code_generation", "repo_scanning", "ci_orchestration", "dependency_audit", "release_automation"],
+};
+
 const CATEGORY_TO_DIVISION: Record<string, string> = {
   "Real Estate": "DreamRealEstate",
   "Lead Generation": "DreamSalesPro",
@@ -304,7 +328,7 @@ function buildHeuristic(folder: string): BotRow {
     tier: "FREE",
     category,
     division: CATEGORY_TO_DIVISION[category] ?? null,
-    capabilities: [],
+    capabilities: CATEGORY_CAPABILITIES[category] ?? ["task_execution"],
     entrypoint: null,
     revenueModel: null,
     owner: null,
