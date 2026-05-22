@@ -65,12 +65,25 @@ type BuildProbe = {
   openPRs: number;
 };
 let buildProbeCache: { at: number; data: BuildProbe } | null = null;
+let buildProbeInFlight: Promise<BuildProbe> | null = null;
 const BUILD_PROBE_TTL_MS = 60_000;
 
 async function probeBuildState(token: string): Promise<BuildProbe> {
   if (buildProbeCache && Date.now() - buildProbeCache.at < BUILD_PROBE_TTL_MS) {
     return buildProbeCache.data;
   }
+  if (buildProbeInFlight) return buildProbeInFlight;
+  buildProbeInFlight = (async () => {
+    try {
+      return await doProbe(token);
+    } finally {
+      buildProbeInFlight = null;
+    }
+  })();
+  return buildProbeInFlight;
+}
+
+async function doProbe(token: string): Promise<BuildProbe> {
   const contractFiles = [
     "bot.manifest.schema.json",
     ".github/copilot-instructions.md",
@@ -135,13 +148,24 @@ router.get("/dashboard/build-progress", async (_req, res): Promise<void> => {
   const ontologyTablesPlanned = 7;
 
   let probe: BuildProbe = { contractPushed: 0, totalBots: 0, botsWithManifest: 0, openPRs: 0 };
+  let probeStatus: "fresh" | "stale" | "unknown" = "unknown";
   if (GITHUB_TOKEN) {
     if (buildProbeCache && Date.now() - buildProbeCache.at < BUILD_PROBE_TTL_MS) {
       probe = buildProbeCache.data;
-    } else {
-      // Kick off the refresh but don't block: serve last-known immediately
+      probeStatus = "fresh";
+    } else if (buildProbeCache) {
+      // Serve last-known immediately; refresh in background (deduped)
+      probe = buildProbeCache.data;
+      probeStatus = "stale";
       void probeBuildState(GITHUB_TOKEN).catch(() => {});
-      probe = buildProbeCache?.data ?? probe;
+    } else {
+      // Cold start: await so we don't serve misleading zeros
+      try {
+        probe = await probeBuildState(GITHUB_TOKEN);
+        probeStatus = "fresh";
+      } catch {
+        probeStatus = "unknown";
+      }
     }
   }
   const { contractPushed, totalBots, botsWithManifest, openPRs } = probe;
@@ -160,18 +184,31 @@ router.get("/dashboard/build-progress", async (_req, res): Promise<void> => {
   const prsMerged = 6;
   const prsArchived = 160;
 
-  const sections = [
-    { name: "Command Center pages", done: pagesBuilt, total: pagesPlanned },
-    { name: "Ontology DB tables", done: ontologyTablesBuilt, total: ontologyTablesPlanned },
-    { name: "Bot contract pushed to Dreamcobots", done: contractPushed, total: contractFilesTotal },
-    { name: "Bots with manifest", done: botsWithManifest, total: Math.max(totalBots, 1) },
-    { name: "Live integrations", done: integrationsLive, total: integrationsTotal },
-    { name: "PRs processed (merged + archived)", done: prsProcessed - openPRs, total: prsProcessed },
+  const clamp = (done: number, total: number) => ({
+    done: Math.max(0, Math.min(done, total)),
+    total: Math.max(total, 0),
+  });
+
+  const rawSections = [
+    { name: "Command Center pages", ...clamp(pagesBuilt, pagesPlanned) },
+    { name: "Ontology DB tables", ...clamp(ontologyTablesBuilt, ontologyTablesPlanned) },
+    { name: "Bot contract pushed to Dreamcobots", ...clamp(contractPushed, contractFilesTotal) },
+    {
+      name: "Bots with manifest",
+      ...clamp(botsWithManifest, totalBots > 0 ? totalBots : 171),
+    },
+    { name: "Live integrations", ...clamp(integrationsLive, integrationsTotal) },
+    {
+      name: "PRs processed (merged + archived)",
+      ...clamp(prsMerged + prsArchived, prsProcessed),
+    },
   ];
 
-  const totalDone = sections.reduce((s, x) => s + x.done, 0);
-  const totalAll = sections.reduce((s, x) => s + x.total, 0);
-  const overallPercent = totalAll > 0 ? Math.round((totalDone / totalAll) * 100) : 0;
+  const totalDone = rawSections.reduce((s, x) => s + x.done, 0);
+  const totalAll = rawSections.reduce((s, x) => s + x.total, 0);
+  const overallPercent =
+    totalAll > 0 ? Math.max(0, Math.min(100, Math.round((totalDone / totalAll) * 100))) : 0;
+  const sections = rawSections;
 
   res.json({
     overallPercent,
@@ -188,6 +225,7 @@ router.get("/dashboard/build-progress", async (_req, res): Promise<void> => {
       prsMerged,
       prsArchived,
       integrations,
+      probeStatus,
     },
   });
 });
