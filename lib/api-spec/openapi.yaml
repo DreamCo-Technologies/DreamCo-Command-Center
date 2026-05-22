@@ -1,0 +1,478 @@
+openapi: 3.1.0
+info:
+  title: Api
+  version: 0.1.0
+  description: DreamCo Command Center API
+servers:
+  - url: /api
+    description: Base API path
+tags:
+  - name: health
+    description: Health operations
+  - name: bots
+    description: Bot management
+  - name: github
+    description: GitHub repository tracking
+  - name: stripe
+    description: Stripe revenue and payments
+  - name: buddy
+    description: BuddyBot AI chatbot
+  - name: dashboard
+    description: Dashboard summary
+
+paths:
+  /healthz:
+    get:
+      operationId: healthCheck
+      tags: [health]
+      summary: Health check
+      responses:
+        "200":
+          description: Healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+
+  /bots:
+    get:
+      operationId: listBots
+      tags: [bots]
+      summary: List all bots with status
+      responses:
+        "200":
+          description: List of bots
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Bot"
+
+  /bots/{name}:
+    get:
+      operationId: getBot
+      tags: [bots]
+      summary: Get bot details
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Bot details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Bot"
+        "404":
+          description: Bot not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /github/repos:
+    get:
+      operationId: listRepos
+      tags: [github]
+      summary: List all GitHub repositories
+      responses:
+        "200":
+          description: List of repos
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Repo"
+
+  /github/commits:
+    get:
+      operationId: listCommits
+      tags: [github]
+      summary: Recent commits across all repos
+      responses:
+        "200":
+          description: Recent commits
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Commit"
+
+  /github/activity:
+    get:
+      operationId: getRepoActivity
+      tags: [github]
+      summary: Repository activity summary
+      responses:
+        "200":
+          description: Activity summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RepoActivity"
+
+  /stripe/revenue:
+    get:
+      operationId: getStripeRevenue
+      tags: [stripe]
+      summary: Stripe revenue metrics
+      responses:
+        "200":
+          description: Revenue metrics
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RevenueMetrics"
+
+  /stripe/subscriptions:
+    get:
+      operationId: listSubscriptions
+      tags: [stripe]
+      summary: Active Stripe subscriptions
+      responses:
+        "200":
+          description: Subscriptions list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Subscription"
+
+  /stripe/transactions:
+    get:
+      operationId: listTransactions
+      tags: [stripe]
+      summary: Recent Stripe transactions
+      responses:
+        "200":
+          description: Recent transactions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Transaction"
+
+  /buddy/chat:
+    post:
+      operationId: sendBuddyMessage
+      tags: [buddy]
+      summary: Send a message to BuddyBot
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BuddyMessageInput"
+      responses:
+        "200":
+          description: BuddyBot response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BuddyResponse"
+
+  /buddy/history:
+    get:
+      operationId: getBuddyHistory
+      tags: [buddy]
+      summary: Get chat history
+      responses:
+        "200":
+          description: Chat history
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ChatMessage"
+
+  /dashboard/summary:
+    get:
+      operationId: getDashboardSummary
+      tags: [dashboard]
+      summary: Overall dashboard stats
+      responses:
+        "200":
+          description: Dashboard summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DashboardSummary"
+
+  /dashboard/tiers:
+    get:
+      operationId: listTiers
+      tags: [dashboard]
+      summary: Subscription tier definitions
+      responses:
+        "200":
+          description: Tier list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Tier"
+
+components:
+  schemas:
+    HealthStatus:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+
+    ErrorResponse:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
+
+    Bot:
+      type: object
+      required: [name, status, tier, category]
+      properties:
+        name:
+          type: string
+        repoPath:
+          type: string
+        status:
+          type: string
+          enum: [active, idle, error, unknown]
+        tier:
+          type: string
+          enum: [FREE, PRO, ENTERPRISE]
+        category:
+          type: string
+        description:
+          type: string
+        lastHeartbeat:
+          type: ["string", "null"]
+        pendingPRs:
+          type: integer
+        revenue:
+          type: number
+        lastUpdate:
+          type: ["string", "null"]
+
+    Repo:
+      type: object
+      required: [name, fullName, description, isPrivate, url, stars, forks, updatedAt]
+      properties:
+        name:
+          type: string
+        fullName:
+          type: string
+        description:
+          type: ["string", "null"]
+        isPrivate:
+          type: boolean
+        url:
+          type: string
+        stars:
+          type: integer
+        forks:
+          type: integer
+        updatedAt:
+          type: string
+        language:
+          type: ["string", "null"]
+        openIssues:
+          type: integer
+
+    Commit:
+      type: object
+      required: [sha, message, author, date, repoName, url]
+      properties:
+        sha:
+          type: string
+        message:
+          type: string
+        author:
+          type: string
+        date:
+          type: string
+        repoName:
+          type: string
+        url:
+          type: string
+
+    RepoActivity:
+      type: object
+      required: [totalCommits, totalRepos, totalBots, activeRepos, recentEvents]
+      properties:
+        totalCommits:
+          type: integer
+        totalRepos:
+          type: integer
+        totalBots:
+          type: integer
+        activeRepos:
+          type: integer
+        recentEvents:
+          type: array
+          items:
+            type: object
+            required: [type, repo, description, date]
+            properties:
+              type:
+                type: string
+              repo:
+                type: string
+              description:
+                type: string
+              date:
+                type: string
+
+    RevenueMetrics:
+      type: object
+      required: [totalRevenue, dailyRevenue, weeklyRevenue, monthlyRevenue, dailyTarget, weeklyTarget, monthlyTarget, currency]
+      properties:
+        totalRevenue:
+          type: number
+        dailyRevenue:
+          type: number
+        weeklyRevenue:
+          type: number
+        monthlyRevenue:
+          type: number
+        dailyTarget:
+          type: number
+        weeklyTarget:
+          type: number
+        monthlyTarget:
+          type: number
+        currency:
+          type: string
+        connected:
+          type: boolean
+
+    Subscription:
+      type: object
+      required: [id, customer, plan, status, amount, currency, currentPeriodEnd]
+      properties:
+        id:
+          type: string
+        customer:
+          type: string
+        plan:
+          type: string
+        status:
+          type: string
+        amount:
+          type: number
+        currency:
+          type: string
+        currentPeriodEnd:
+          type: string
+
+    Transaction:
+      type: object
+      required: [id, amount, currency, status, description, date]
+      properties:
+        id:
+          type: string
+        amount:
+          type: number
+        currency:
+          type: string
+        status:
+          type: string
+        description:
+          type: string
+        date:
+          type: string
+
+    BuddyMessageInput:
+      type: object
+      required: [message]
+      properties:
+        message:
+          type: string
+        sessionId:
+          type: string
+
+    BuddyResponse:
+      type: object
+      required: [message, sessionId, timestamp]
+      properties:
+        message:
+          type: string
+        sessionId:
+          type: string
+        timestamp:
+          type: string
+        emotion:
+          type: ["string", "null"]
+
+    ChatMessage:
+      type: object
+      required: [id, role, content, timestamp]
+      properties:
+        id:
+          type: string
+        role:
+          type: string
+          enum: [user, buddy]
+        content:
+          type: string
+        timestamp:
+          type: string
+        emotion:
+          type: ["string", "null"]
+
+    DashboardSummary:
+      type: object
+      required: [totalBots, activeBots, idleBots, totalRepos, dailyRevenue, monthlyRevenue, dailyTarget, monthlyTarget, totalSubscriptions, recentCommits]
+      properties:
+        totalBots:
+          type: integer
+        activeBots:
+          type: integer
+        idleBots:
+          type: integer
+        totalRepos:
+          type: integer
+        dailyRevenue:
+          type: number
+        monthlyRevenue:
+          type: number
+        dailyTarget:
+          type: number
+        monthlyTarget:
+          type: number
+        totalSubscriptions:
+          type: integer
+        recentCommits:
+          type: integer
+        profitTargetDaily:
+          type: number
+        profitTargetMonthly:
+          type: number
+
+    Tier:
+      type: object
+      required: [name, priceMonthly, requestsPerMonth, concurrentBots, models]
+      properties:
+        name:
+          type: string
+        priceMonthly:
+          type: number
+        requestsPerMonth:
+          type: integer
+        concurrentBots:
+          type: integer
+        models:
+          type: array
+          items:
+            type: string
