@@ -58,7 +58,72 @@ router.get("/dashboard/summary", async (req, res): Promise<void> => {
   }
 });
 
+type BuildProbe = {
+  contractPushed: number;
+  totalBots: number;
+  botsWithManifest: number;
+  openPRs: number;
+};
+let buildProbeCache: { at: number; data: BuildProbe } | null = null;
+const BUILD_PROBE_TTL_MS = 60_000;
+
+async function probeBuildState(token: string): Promise<BuildProbe> {
+  if (buildProbeCache && Date.now() - buildProbeCache.at < BUILD_PROBE_TTL_MS) {
+    return buildProbeCache.data;
+  }
+  const contractFiles = [
+    "bot.manifest.schema.json",
+    ".github/copilot-instructions.md",
+    ".github/workflows/validate-bot-pr.yml",
+    ".github/workflows/auto-merge-intake.yml",
+    "UNMERGED_PRS.md",
+  ];
+  let contractPushed = 0;
+  let totalBots = 0;
+  let botsWithManifest = 0;
+  let openPRs = 0;
+  const h = { Authorization: `token ${token}`, "User-Agent": "dreamco" };
+  await Promise.all(
+    contractFiles.map(async (file) => {
+      try {
+        const r = await fetch(
+          `https://api.github.com/repos/DreamCo-Technologies/Dreamcobots/contents/${file}`,
+          { headers: h },
+        );
+        if (r.ok) contractPushed++;
+      } catch {}
+    }),
+  );
+  try {
+    const treeRes = await fetch(
+      "https://api.github.com/repos/DreamCo-Technologies/Dreamcobots/git/trees/HEAD?recursive=1",
+      { headers: h },
+    );
+    const tree = (await treeRes.json()) as { tree?: Array<{ type: string; path: string }> };
+    if (tree.tree) {
+      totalBots = tree.tree.filter(
+        (f) => f.type === "tree" && f.path.startsWith("bots/") && f.path.split("/").length === 2,
+      ).length;
+      botsWithManifest = tree.tree.filter(
+        (f) => f.type === "blob" && f.path.startsWith("bots/") && f.path.endsWith("/bot.manifest.json"),
+      ).length;
+    }
+  } catch {}
+  try {
+    const s = await fetch(
+      "https://api.github.com/search/issues?q=is:pr+is:open+repo:DreamCo-Technologies/Dreamcobots",
+      { headers: h },
+    );
+    const sd = (await s.json()) as { total_count?: number };
+    openPRs = sd.total_count ?? 0;
+  } catch {}
+  const data = { contractPushed, totalBots, botsWithManifest, openPRs };
+  buildProbeCache = { at: Date.now(), data };
+  return data;
+}
+
 router.get("/dashboard/build-progress", async (_req, res): Promise<void> => {
+  res.setHeader("Cache-Control", "no-store");
   const GITHUB_TOKEN = process.env.GITHUB_PERSONAL_ACCESS_TOKEN;
 
   // Count current Command Center pages
@@ -69,61 +134,18 @@ router.get("/dashboard/build-progress", async (_req, res): Promise<void> => {
   const ontologyTablesBuilt = 7;
   const ontologyTablesPlanned = 7;
 
-  // Probe Dreamcobots contract files
-  let contractPushed = 0;
-  const contractFiles = [
-    "bot.manifest.schema.json",
-    ".github/copilot-instructions.md",
-    ".github/workflows/validate-bot-pr.yml",
-    ".github/workflows/auto-merge-intake.yml",
-    "UNMERGED_PRS.md",
-  ];
-  let totalBots = 0;
-  let botsWithManifest = 0;
-  let openPRs = 0;
-
+  let probe: BuildProbe = { contractPushed: 0, totalBots: 0, botsWithManifest: 0, openPRs: 0 };
   if (GITHUB_TOKEN) {
-    await Promise.all(
-      contractFiles.map(async (file) => {
-        try {
-          const r = await fetch(
-            `https://api.github.com/repos/DreamCo-Technologies/Dreamcobots/contents/${file}`,
-            { headers: { Authorization: `token ${GITHUB_TOKEN}`, "User-Agent": "dreamco" } },
-          );
-          if (r.ok) contractPushed++;
-        } catch {}
-      }),
-    );
-
-    try {
-      const treeRes = await fetch(
-        "https://api.github.com/repos/DreamCo-Technologies/Dreamcobots/git/trees/HEAD?recursive=1",
-        { headers: { Authorization: `token ${GITHUB_TOKEN}`, "User-Agent": "dreamco" } },
-      );
-      const tree = (await treeRes.json()) as { tree?: Array<{ type: string; path: string }> };
-      if (tree.tree) {
-        const botDirs = tree.tree.filter(
-          (f) => f.type === "tree" && f.path.startsWith("bots/") && f.path.split("/").length === 2,
-        );
-        totalBots = botDirs.length;
-        botsWithManifest = tree.tree.filter(
-          (f) =>
-            f.type === "blob" &&
-            f.path.startsWith("bots/") &&
-            f.path.endsWith("/bot.manifest.json"),
-        ).length;
-      }
-    } catch {}
-
-    try {
-      const s = await fetch(
-        "https://api.github.com/search/issues?q=is:pr+is:open+repo:DreamCo-Technologies/Dreamcobots",
-        { headers: { Authorization: `token ${GITHUB_TOKEN}`, "User-Agent": "dreamco" } },
-      );
-      const sd = (await s.json()) as { total_count?: number };
-      openPRs = sd.total_count ?? 0;
-    } catch {}
+    if (buildProbeCache && Date.now() - buildProbeCache.at < BUILD_PROBE_TTL_MS) {
+      probe = buildProbeCache.data;
+    } else {
+      // Kick off the refresh but don't block: serve last-known immediately
+      void probeBuildState(GITHUB_TOKEN).catch(() => {});
+      probe = buildProbeCache?.data ?? probe;
+    }
   }
+  const { contractPushed, totalBots, botsWithManifest, openPRs } = probe;
+  const contractFilesTotal = 5;
 
   const integrations = {
     github: Boolean(GITHUB_TOKEN),
@@ -141,7 +163,7 @@ router.get("/dashboard/build-progress", async (_req, res): Promise<void> => {
   const sections = [
     { name: "Command Center pages", done: pagesBuilt, total: pagesPlanned },
     { name: "Ontology DB tables", done: ontologyTablesBuilt, total: ontologyTablesPlanned },
-    { name: "Bot contract pushed to Dreamcobots", done: contractPushed, total: contractFiles.length },
+    { name: "Bot contract pushed to Dreamcobots", done: contractPushed, total: contractFilesTotal },
     { name: "Bots with manifest", done: botsWithManifest, total: Math.max(totalBots, 1) },
     { name: "Live integrations", done: integrationsLive, total: integrationsTotal },
     { name: "PRs processed (merged + archived)", done: prsProcessed - openPRs, total: prsProcessed },
@@ -158,7 +180,7 @@ router.get("/dashboard/build-progress", async (_req, res): Promise<void> => {
       pagesBuilt,
       pagesPlanned,
       contractPushed,
-      contractTotal: contractFiles.length,
+      contractTotal: contractFilesTotal,
       totalBots,
       botsWithManifest,
       openPRs,

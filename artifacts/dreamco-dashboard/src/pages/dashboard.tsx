@@ -178,7 +178,7 @@ export default function Dashboard() {
                 indicatorClassName={getProgressColor(build?.overallPercent ?? 0)}
               />
               <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-3 pt-2">
-                {build?.sections.map((s) => {
+                {build?.sections?.map((s) => {
                   const pct = s.total > 0 ? Math.round((s.done / s.total) * 100) : 0;
                   return (
                     <div key={s.name} className="space-y-1">
