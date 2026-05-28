@@ -1,17 +1,33 @@
 import { Link, useLocation } from "wouter";
-import { 
-  Terminal, 
-  Activity, 
-  Bot, 
-  DollarSign, 
-  GitMerge, 
+import {
+  Terminal,
+  Activity,
+  Bot,
+  DollarSign,
+  GitMerge,
   Network,
   GitPullRequest,
   LayoutGrid,
   Sparkles,
   PlayCircle,
   Brain,
-  Zap
+  Zap,
+  BarChart3,
+  FlaskConical,
+  GraduationCap,
+  Globe,
+  Store,
+  Bitcoin,
+  CreditCard,
+  Rocket,
+  Code2,
+  Landmark,
+  Bug,
+  Tag,
+  Plug,
+  History,
+  Wallet,
+  Cpu,
 } from "lucide-react";
 import {
   Sidebar,
@@ -23,21 +39,57 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-  SidebarSeparator
 } from "@/components/ui/sidebar";
 
-const navItems = [
-  { title: "Dashboard", url: "/", icon: Activity },
-  { title: "Bot Registry", url: "/bots", icon: Bot },
-  { title: "Buddy AI", url: "/buddy", icon: Terminal },
-  { title: "Revenue", url: "/revenue", icon: DollarSign },
-  { title: "Repositories", url: "/github", icon: GitMerge },
-  { title: "Divisions", url: "/divisions", icon: Network },
-  { title: "Copilot", url: "/copilot", icon: GitPullRequest },
-  { title: "System Status", url: "/system", icon: LayoutGrid },
-  { title: "Vibe Engine", url: "/vibe", icon: Sparkles },
-  { title: "GH Actions", url: "/actions", icon: PlayCircle },
-  { title: "Capabilities", url: "/capabilities", icon: Brain },
+const navGroups: { label: string; items: { title: string; url: string; icon: typeof Activity }[] }[] = [
+  {
+    label: "Command",
+    items: [
+      { title: "Chat", url: "/chat", icon: Terminal },
+      { title: "Empire HQ", url: "/", icon: Activity },
+      { title: "Divisions", url: "/divisions", icon: Network },
+      { title: "Bot Fleet", url: "/bots", icon: Bot },
+      { title: "GH Actions", url: "/actions", icon: PlayCircle },
+      { title: "Orchestration", url: "/orchestration", icon: GitPullRequest },
+    ],
+  },
+  {
+    label: "Intelligence",
+    items: [
+      { title: "Deal Analyzer", url: "/deals", icon: BarChart3 },
+      { title: "Formula Vault", url: "/formulas", icon: FlaskConical },
+      { title: "Learning Matrix", url: "/learning-matrix", icon: GraduationCap },
+      { title: "AI Leaders", url: "/ai-leaders", icon: Brain },
+      { title: "AI Models Hub", url: "/ai-models", icon: LayoutGrid },
+      { title: "AI Ecosystem", url: "/ecosystem", icon: Globe },
+      { title: "Vibe Engine", url: "/vibe", icon: Sparkles },
+      { title: "Capabilities", url: "/capabilities", icon: Cpu },
+    ],
+  },
+  {
+    label: "Commerce",
+    items: [
+      { title: "Marketplace", url: "/marketplace", icon: Store },
+      { title: "Crypto", url: "/crypto", icon: Bitcoin },
+      { title: "Payments", url: "/payments", icon: CreditCard },
+      { title: "Biz Launch", url: "/business", icon: Rocket },
+      { title: "Loans & Deals", url: "/loans", icon: Landmark },
+      { title: "Revenue", url: "/revenue", icon: DollarSign },
+      { title: "Pricing", url: "/pricing", icon: Tag },
+    ],
+  },
+  {
+    label: "Operations",
+    items: [
+      { title: "Code Lab", url: "/code-lab", icon: Code2 },
+      { title: "Debug Intel", url: "/debug", icon: Bug },
+      { title: "Repositories", url: "/github", icon: GitMerge },
+      { title: "Connections", url: "/connections", icon: Plug },
+      { title: "Time Capsule", url: "/time-capsule", icon: History },
+      { title: "Cost Tracking", url: "/costs", icon: Wallet },
+      { title: "Autonomy", url: "/autonomy", icon: Cpu },
+    ],
+  },
 ];
 
 export function AppSidebar() {
@@ -52,26 +104,28 @@ export function AppSidebar() {
         </div>
       </SidebarHeader>
       <SidebarContent>
-        <SidebarGroup>
-          <SidebarGroupLabel className="text-xs font-mono uppercase text-muted-foreground tracking-wider mb-2">Systems</SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {navItems.map((item) => {
-                const isActive = location === item.url;
-                return (
-                  <SidebarMenuItem key={item.title}>
-                    <SidebarMenuButton asChild isActive={isActive} tooltip={item.title}>
-                      <Link href={item.url} className={`flex items-center gap-3 font-mono text-sm ${isActive ? 'text-primary' : 'text-muted-foreground hover:text-foreground'}`}>
-                        <item.icon className="h-4 w-4" />
-                        <span>{item.title}</span>
-                      </Link>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                );
-              })}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
+        {navGroups.map((group) => (
+          <SidebarGroup key={group.label}>
+            <SidebarGroupLabel className="text-xs font-mono uppercase text-muted-foreground tracking-wider mb-1">{group.label}</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {group.items.map((item) => {
+                  const isActive = location === item.url;
+                  return (
+                    <SidebarMenuItem key={item.title}>
+                      <SidebarMenuButton asChild isActive={isActive} tooltip={item.title}>
+                        <Link href={item.url} className={`flex items-center gap-3 font-mono text-sm ${isActive ? "text-primary" : "text-muted-foreground hover:text-foreground"}`}>
+                          <item.icon className="h-4 w-4" />
+                          <span>{item.title}</span>
+                        </Link>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  );
+                })}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        ))}
       </SidebarContent>
     </Sidebar>
   );
