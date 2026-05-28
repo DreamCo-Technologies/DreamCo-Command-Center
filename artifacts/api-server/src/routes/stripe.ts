@@ -1,20 +1,12 @@
 import { Router, type IRouter } from "express";
-import { logger } from "../lib/logger";
+import { getStripeClient } from "../lib/stripeClient";
 
 const router: IRouter = Router();
-
-const STRIPE_KEY = process.env.STRIPE_SECRET_KEY;
 
 // Profit targets from master_config.yaml
 const DAILY_TARGET = 500;
 const WEEKLY_TARGET = 3500;
 const MONTHLY_TARGET = 15000;
-
-async function getStripeClient() {
-  if (!STRIPE_KEY || STRIPE_KEY.includes("placeholder")) return null;
-  const { default: Stripe } = await import("stripe");
-  return new Stripe(STRIPE_KEY);
-}
 
 router.get("/stripe/revenue", async (req, res): Promise<void> => {
   const stripe = await getStripeClient();
@@ -103,7 +95,7 @@ router.get("/stripe/subscriptions", async (req, res): Promise<void> => {
           status: sub.status,
           amount: (item?.price?.unit_amount ?? 0) / 100,
           currency: item?.price?.currency ?? "usd",
-          currentPeriodEnd: new Date(sub.current_period_end * 1000).toISOString(),
+          currentPeriodEnd: new Date(((sub as unknown as { current_period_end?: number }).current_period_end ?? (item as unknown as { current_period_end?: number })?.current_period_end ?? 0) * 1000).toISOString(),
         };
       })
     );
@@ -143,6 +135,50 @@ router.get("/stripe/transactions", async (req, res): Promise<void> => {
   } catch (err) {
     req.log.error({ err }, "Stripe transactions fetch failed");
     res.json([]);
+  }
+});
+
+router.post("/stripe/checkout", async (req, res): Promise<void> => {
+  const stripe = await getStripeClient();
+  if (!stripe) {
+    res.status(503).json({ error: "Stripe not configured. Add STRIPE_SECRET_KEY." });
+    return;
+  }
+  const body = req.body as { tier?: string; botSlug?: string; successUrl?: string; cancelUrl?: string };
+  const tierPrices: Record<string, number> = { FREE: 0, PRO: 4900, ENTERPRISE: 29900 };
+  const tier = (body.tier ?? "PRO").toUpperCase();
+  const amount = tierPrices[tier] ?? 4900;
+  if (amount === 0) {
+    res.status(400).json({ error: "FREE tier has no checkout" });
+    return;
+  }
+  const origin =
+    req.headers.origin ??
+    (process.env.REPLIT_DOMAINS?.split(",")[0]
+      ? `https://${process.env.REPLIT_DOMAINS.split(",")[0]}`
+      : "http://localhost");
+  try {
+    const session = await stripe.checkout.sessions.create({
+      mode: "subscription",
+      line_items: [
+        {
+          price_data: {
+            currency: "usd",
+            product_data: { name: `DreamCo ${tier}` },
+            unit_amount: amount,
+            recurring: { interval: "month" },
+          },
+          quantity: 1,
+        },
+      ],
+      metadata: { tier, bot_slug: body.botSlug ?? "platform" },
+      success_url: body.successUrl ?? `${origin}/revenue?status=success`,
+      cancel_url: body.cancelUrl ?? `${origin}/revenue?status=cancelled`,
+    });
+    res.json({ url: session.url, id: session.id });
+  } catch (err) {
+    req.log.error({ err }, "checkout session failed");
+    res.status(500).json({ error: "checkout failed" });
   }
 });
 

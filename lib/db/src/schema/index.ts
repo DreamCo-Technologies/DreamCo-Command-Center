@@ -7,3 +7,5 @@ export * from "./workflows";
 export * from "./events";
 export * from "./bot_manifest";
 export * from "./auth";
+export * from "./bot_runs";
+export * from "./vibe";

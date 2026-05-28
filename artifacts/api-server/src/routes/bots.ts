@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { validateBotManifest, type BotManifest } from "@workspace/db/schema";
-import { db, agentsTable, type Agent } from "@workspace/db";
+import { db, agentsTable, botRunsTable, botLearningsTable, type Agent } from "@workspace/db";
 import { eq, sql } from "drizzle-orm";
 import { logger } from "../lib/logger";
 import {
@@ -469,6 +469,28 @@ router.post("/bots/:name/run", async (req, res): Promise<void> => {
         .returning();
       row = updated[0]!;
     }
+    // Insert a bot_run row so we can observe activity + later attach earnings
+    const runRow = await db
+      .insert(botRunsTable)
+      .values({
+        botSlug: name,
+        status: "succeeded",
+        triggeredBy: "manual",
+        input: (req.body as Record<string, unknown> | undefined) ?? {},
+        output: { message: `Manual run for ${name}` },
+        durationMs: 0,
+        endedAt: now,
+      })
+      .returning();
+    // Seed a learning row so the bot starts a memory trail
+    await db.insert(botLearningsTable).values({
+      botSlug: name,
+      kind: "run_observation",
+      prompt: `Manual invocation of ${row.slug}`,
+      outcome: "succeeded",
+      reward: 0.1,
+      metadata: { runId: runRow[0]?.id },
+    });
     // Invalidate the bot list cache so the next /bots reflects new status/heartbeat
     botCache = null;
     res.json({

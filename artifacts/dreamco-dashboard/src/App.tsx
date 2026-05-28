@@ -15,6 +15,8 @@ import Github from "@/pages/github";
 import Divisions from "@/pages/divisions";
 import Copilot from "@/pages/copilot";
 import SystemPage from "@/pages/system";
+import VibePage from "@/pages/vibe";
+import ActionsPage from "@/pages/actions";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -36,6 +38,8 @@ function Router() {
         <Route path="/divisions" component={Divisions} />
         <Route path="/copilot" component={Copilot} />
         <Route path="/system" component={SystemPage} />
+        <Route path="/vibe" component={VibePage} />
+        <Route path="/actions" component={ActionsPage} />
         <Route component={NotFound} />
       </Switch>
     </Layout>

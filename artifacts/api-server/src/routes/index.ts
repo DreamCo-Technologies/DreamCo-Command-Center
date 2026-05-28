@@ -7,6 +7,8 @@ import buddyRouter from "./buddy";
 import dashboardRouter from "./dashboard";
 import copilotRouter from "./copilot";
 import authRouter from "./auth";
+import earningsRouter from "./earnings";
+import vibeRouter from "./vibe";
 
 const router: IRouter = Router();
 
@@ -18,5 +20,7 @@ router.use(buddyRouter);
 router.use(dashboardRouter);
 router.use(copilotRouter);
 router.use(authRouter);
+router.use(earningsRouter);
+router.use(vibeRouter);
 
 export default router;

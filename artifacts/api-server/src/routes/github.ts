@@ -132,4 +132,47 @@ router.get("/github/activity", async (req, res): Promise<void> => {
   }
 });
 
+interface GhRun {
+  id: number; name: string | null; head_branch: string | null;
+  status: string; conclusion: string | null; html_url: string;
+  created_at: string; updated_at: string; event: string;
+  run_number: number; actor?: { login: string };
+}
+interface GhRunsResponse { workflow_runs?: GhRun[] }
+
+router.get("/github/actions", async (req, res): Promise<void> => {
+  try {
+    const all: object[] = [];
+    let totalRuns = 0, success = 0, failure = 0, inProgress = 0;
+    for (const repo of REPOS) {
+      try {
+        const data = await ghFetch(`/repos/${ORG}/${repo}/actions/runs?per_page=15`) as GhRunsResponse;
+        for (const run of data.workflow_runs ?? []) {
+          totalRuns++;
+          if (run.status === "in_progress" || run.status === "queued") inProgress++;
+          else if (run.conclusion === "success") success++;
+          else if (run.conclusion === "failure") failure++;
+          all.push({
+            id: run.id, repo, name: run.name ?? "(unnamed)",
+            branch: run.head_branch, status: run.status,
+            conclusion: run.conclusion, event: run.event,
+            runNumber: run.run_number, actor: run.actor?.login ?? null,
+            url: run.html_url, createdAt: run.created_at, updatedAt: run.updated_at,
+          });
+        }
+      } catch (err) {
+        logger.warn({ err, repo }, "actions fetch failed for repo");
+      }
+    }
+    all.sort((a, b) => new Date((b as { updatedAt: string }).updatedAt).getTime() - new Date((a as { updatedAt: string }).updatedAt).getTime());
+    res.json({
+      totals: { totalRuns, success, failure, inProgress },
+      runs: all.slice(0, 50),
+    });
+  } catch (err) {
+    req.log.error({ err }, "github/actions failed");
+    res.json({ totals: { totalRuns: 0, success: 0, failure: 0, inProgress: 0 }, runs: [] });
+  }
+});
+
 export default router;

@@ -8,6 +8,8 @@ import {
   Network,
   GitPullRequest,
   LayoutGrid,
+  Sparkles,
+  PlayCircle,
   Zap
 } from "lucide-react";
 import {
@@ -32,6 +34,8 @@ const navItems = [
   { title: "Divisions", url: "/divisions", icon: Network },
   { title: "Copilot", url: "/copilot", icon: GitPullRequest },
   { title: "System Status", url: "/system", icon: LayoutGrid },
+  { title: "Vibe Engine", url: "/vibe", icon: Sparkles },
+  { title: "GH Actions", url: "/actions", icon: PlayCircle },
 ];
 
 export function AppSidebar() {
