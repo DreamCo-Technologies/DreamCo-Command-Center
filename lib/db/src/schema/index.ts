@@ -5,3 +5,5 @@ export * from "./agent_capabilities";
 export * from "./agent_inheritance";
 export * from "./workflows";
 export * from "./events";
+export * from "./bot_manifest";
+export * from "./auth";

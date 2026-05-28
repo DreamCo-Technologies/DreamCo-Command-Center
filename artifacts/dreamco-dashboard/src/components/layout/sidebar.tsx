@@ -6,6 +6,8 @@ import {
   DollarSign, 
   GitMerge, 
   Network,
+  GitPullRequest,
+  LayoutGrid,
   Zap
 } from "lucide-react";
 import {
@@ -28,6 +30,8 @@ const navItems = [
   { title: "Revenue", url: "/revenue", icon: DollarSign },
   { title: "Repositories", url: "/github", icon: GitMerge },
   { title: "Divisions", url: "/divisions", icon: Network },
+  { title: "Copilot", url: "/copilot", icon: GitPullRequest },
+  { title: "System Status", url: "/system", icon: LayoutGrid },
 ];
 
 export function AppSidebar() {

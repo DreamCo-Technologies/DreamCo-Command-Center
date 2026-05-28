@@ -13,6 +13,8 @@ import Buddy from "@/pages/buddy";
 import Revenue from "@/pages/revenue";
 import Github from "@/pages/github";
 import Divisions from "@/pages/divisions";
+import Copilot from "@/pages/copilot";
+import SystemPage from "@/pages/system";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -32,6 +34,8 @@ function Router() {
         <Route path="/revenue" component={Revenue} />
         <Route path="/github" component={Github} />
         <Route path="/divisions" component={Divisions} />
+        <Route path="/copilot" component={Copilot} />
+        <Route path="/system" component={SystemPage} />
         <Route component={NotFound} />
       </Switch>
     </Layout>
