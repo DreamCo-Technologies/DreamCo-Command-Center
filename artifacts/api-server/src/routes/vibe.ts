@@ -189,12 +189,64 @@ router.post("/vibe/learn", requireAuth, async (req, res): Promise<void> => {
 });
 
 // POST /api/vibe/train-all  (auth required) — kicks off mastery sweep across all ecosystems
+// GLOBAL library coverage — not just US/English ecosystems. Every major language + regional powerhouses.
 const TRAIN_ALL_TARGETS: Record<string, string[]> = {
-  python: ["numpy","pandas","scipy","scikit-learn","torch","transformers","sympy","networkx","statsmodels","jax","matplotlib","fastapi","pydantic","langchain","opencv-python"],
-  javascript: ["react","three.js","d3","tensorflow.js","rxjs","tone.js","mathjs","fabric.js","p5","gsap","zod","express","next"],
-  rust: ["nalgebra","tokio","rayon","candle-core","petgraph","serde","actix-web","polars"],
-  go: ["gonum","ent","fiber","cobra","gin","gorm"],
-  julia: ["Flux.jl","DifferentialEquations.jl","JuMP.jl","Plots.jl","DataFrames.jl"],
+  // Western mainstream
+  python: ["numpy","pandas","scipy","scikit-learn","torch","transformers","sympy","networkx","statsmodels","jax","matplotlib","fastapi","pydantic","langchain","opencv-python","polars","dask","ray","huggingface_hub","diffusers","accelerate","lightgbm","xgboost","gymnasium","streamlit"],
+  javascript: ["react","three.js","d3","tensorflow.js","rxjs","tone.js","mathjs","fabric.js","p5","gsap","zod","express","next","vue","svelte","solid-js","webgpu","onnxruntime-web","ml5","brain.js","phaser"],
+  typescript: ["nestjs","trpc","drizzle-orm","prisma","fastify","hono","effect","xstate","tanstack-query"],
+  rust: ["nalgebra","tokio","rayon","candle-core","petgraph","serde","actix-web","polars","wgpu","bevy","burn","tch","plotters"],
+  go: ["gonum","ent","fiber","cobra","gin","gorm","gorgonia","go-kit","kubernetes","prometheus"],
+  julia: ["Flux.jl","DifferentialEquations.jl","JuMP.jl","Plots.jl","DataFrames.jl","Turing.jl","Symbolics.jl","Gen.jl"],
+  // JVM
+  java: ["spring-boot","apache-spark","deeplearning4j","akka","quarkus","jhipster","weka","jblas"],
+  kotlin: ["ktor","koin","exposed","kotlinx-coroutines","mockk","arrow-kt"],
+  scala: ["akka","cats","zio","spark","scalaz","play-framework","breeze"],
+  clojure: ["core.async","ring","compojure","reagent","datomic","libpython-clj"],
+  // Apple / mobile
+  swift: ["swiftui","combine","vapor","alamofire","tca","swift-numerics","metal-performance-shaders"],
+  // Functional
+  haskell: ["lens","stm","servant","hmatrix","accelerate","yesod","aeson"],
+  ocaml: ["dune","owl","jane-street-core","mirage","lwt"],
+  elixir: ["phoenix","ecto","liveview","nx","axon","broadway","oban"],
+  erlang: ["otp","cowboy","rabbitmq","mnesia"],
+  fsharp: ["fable","giraffe","mathnet","accord"],
+  // Data / scientific
+  r: ["tidyverse","ggplot2","caret","data.table","shiny","keras","tensorflow","mlr3","brms","stan"],
+  matlab: ["simulink","statistics-toolbox","signal-processing","control-systems","computer-vision"],
+  octave: ["signal","statistics","image","optim","control"],
+  // Systems
+  cpp: ["eigen","boost","opencv","libtorch","pcl","arrayfire","tbb","cgal","fmtlib","abseil","spdlog"],
+  c: ["glib","openssl","libuv","sqlite","raylib","gtk"],
+  zig: ["std","zls","raylib-zig","mach"],
+  nim: ["arraymancer","nimx","jester","norm"],
+  crystal: ["kemal","amber","granite","crystal-db"],
+  // Web/scripting
+  ruby: ["rails","sidekiq","sinatra","numo","daru","torch-rb"],
+  php: ["laravel","symfony","phpunit","rubix-ml","php-ml"],
+  perl: ["mojolicious","dancer2","ai-mxnet","pdl"],
+  lua: ["love2d","torch","fennel","lapis","openresty"],
+  // Asia: China
+  python_cn: ["paddlepaddle","mindspore","modelscope","megengine","jittor","oneflow","x2paddle","tianshou"],
+  // Asia: Japan
+  python_jp: ["chainer","nnabla","ginza","sudachi","ja-tokenizer","mecab-python3"],
+  // India / global ML
+  python_in: ["indicnlp","ai4bharat-transliteration","stanza","polyglot"],
+  // Russia / Eastern Europe
+  python_ru: ["catboost","natasha","deeppavlov","rusentitokenizer","pymorphy2"],
+  // Korea
+  python_kr: ["konlpy","kobart","pororo","kss"],
+  // Game engines / creative
+  gdscript: ["godot-stdlib","godot-jolt","godot-fmod"],
+  hlsl: ["shader-toy","unreal-materials","unity-urp"],
+  glsl: ["shadertoy","glslang","webgl-samples"],
+  // Smart contracts / blockchain
+  solidity: ["openzeppelin","hardhat-helpers","chainlink","uniswap-v4"],
+  move: ["aptos-stdlib","sui-framework"],
+  cairo: ["starknet-by-example","alexandria"],
+  // Quantum / scientific
+  qsharp: ["microsoft-quantum-katas","qdk-samples"],
+  python_quantum: ["qiskit","cirq","pennylane","strawberryfields","openfermion"],
 };
 router.post("/vibe/train-all", requireAuth, async (req, res): Promise<void> => {
   res.json({ ok: true, started: true, queued: Object.fromEntries(Object.entries(TRAIN_ALL_TARGETS).map(([k,v]) => [k, v.length])) });

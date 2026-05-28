@@ -10,6 +10,7 @@ import {
   LayoutGrid,
   Sparkles,
   PlayCircle,
+  Brain,
   Zap
 } from "lucide-react";
 import {
@@ -36,6 +37,7 @@ const navItems = [
   { title: "System Status", url: "/system", icon: LayoutGrid },
   { title: "Vibe Engine", url: "/vibe", icon: Sparkles },
   { title: "GH Actions", url: "/actions", icon: PlayCircle },
+  { title: "Capabilities", url: "/capabilities", icon: Brain },
 ];
 
 export function AppSidebar() {

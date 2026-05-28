@@ -17,6 +17,7 @@ import Copilot from "@/pages/copilot";
 import SystemPage from "@/pages/system";
 import VibePage from "@/pages/vibe";
 import ActionsPage from "@/pages/actions";
+import CapabilitiesPage from "@/pages/capabilities";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -40,6 +41,7 @@ function Router() {
         <Route path="/system" component={SystemPage} />
         <Route path="/vibe" component={VibePage} />
         <Route path="/actions" component={ActionsPage} />
+        <Route path="/capabilities" component={CapabilitiesPage} />
         <Route component={NotFound} />
       </Switch>
     </Layout>

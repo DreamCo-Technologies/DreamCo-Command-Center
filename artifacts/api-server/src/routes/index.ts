@@ -9,6 +9,7 @@ import copilotRouter from "./copilot";
 import authRouter from "./auth";
 import earningsRouter from "./earnings";
 import vibeRouter from "./vibe";
+import buddyCapabilitiesRouter from "./buddyCapabilities";
 
 const router: IRouter = Router();
 
@@ -22,5 +23,6 @@ router.use(copilotRouter);
 router.use(authRouter);
 router.use(earningsRouter);
 router.use(vibeRouter);
+router.use(buddyCapabilitiesRouter);
 
 export default router;
