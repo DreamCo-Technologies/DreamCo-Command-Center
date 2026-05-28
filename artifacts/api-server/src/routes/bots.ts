@@ -10,6 +10,8 @@ import {
   ghFetchRaw,
 } from "../lib/githubClient";
 import { getStripeClient } from "../lib/stripeClient";
+import { requireAuth } from "../middlewares/authMiddleware";
+import { indexBots } from "../lib/botIndexer";
 
 const router: IRouter = Router();
 
@@ -388,6 +390,7 @@ async function buildAllBots(): Promise<BotRow[]> {
 
   const CONCURRENCY = 8;
   const results: BotRow[] = [];
+  const seen = new Set<string>();
   for (let i = 0; i < folders.length; i += CONCURRENCY) {
     const batch = folders.slice(i, i + CONCURRENCY);
     const rows = await Promise.all(
@@ -399,8 +402,48 @@ async function buildAllBots(): Promise<BotRow[]> {
         return applyTelemetry(base, folder, manifest?.status ?? null, telemetry);
       }),
     );
-    results.push(...rows);
+    for (const r of rows) {
+      results.push(r);
+      seen.add(r.name.toLowerCase());
+    }
   }
+
+  // Merge in the indexed fleet (agents seeded from the Dreamcobots repo scan)
+  // that aren't already represented by a manifest/heuristic folder row.
+  for (const agent of telemetry.agents.values()) {
+    const key = agent.slug.toLowerCase();
+    if (seen.has(key)) continue;
+    const cfg = (agent.runtimeConfig ?? {}) as Record<string, unknown>;
+    const category = typeof cfg.category === "string" ? cfg.category : heuristicCategory(agent.slug);
+    const division =
+      typeof cfg.division === "string"
+        ? cfg.division
+        : CATEGORY_TO_DIVISION[category] ?? null;
+    const s = agent.status;
+    const status: BotRow["status"] =
+      s === "active" || s === "idle" || s === "error" ? s : "unknown";
+    results.push({
+      name: agent.slug,
+      displayName: agent.name,
+      repoPath: agent.repoPath ?? `bots/${agent.slug}`,
+      status,
+      tier: (agent.tier as BotRow["tier"]) ?? "FREE",
+      category,
+      division,
+      capabilities: CATEGORY_CAPABILITIES[category] ?? ["task_execution"],
+      entrypoint: null,
+      revenueModel: null,
+      owner: null,
+      description: agent.description ?? `DreamCo ${category} bot — ${agent.slug.replace(/_/g, " ")}`,
+      lastHeartbeat: agent.lastHeartbeat ? agent.lastHeartbeat.toISOString() : null,
+      pendingPRs: telemetry.pendingPRs.get(key) ?? 0,
+      revenue: telemetry.revenue.get(key) ?? agent.revenueGenerated ?? 0,
+      lastUpdate: agent.updatedAt ? agent.updatedAt.toISOString() : null,
+      source: "manifest",
+    });
+    seen.add(key);
+  }
+
   return results;
 }
 
@@ -419,6 +462,18 @@ router.get("/bots", async (req, res): Promise<void> => {
     "Returning bots (manifest-aware)",
   );
   res.json(bots);
+});
+
+router.post("/bots/index", requireAuth, async (req, res): Promise<void> => {
+  try {
+    const result = await indexBots();
+    botCache = null; // force /bots to reflect newly indexed agents
+    req.log.info(result, "fleet index complete");
+    res.json({ ok: true, ...result });
+  } catch (err) {
+    req.log.error({ err }, "fleet index failed");
+    res.status(500).json({ error: "Indexing failed", detail: String(err) });
+  }
 });
 
 router.post("/bots/:name/run", async (req, res): Promise<void> => {
