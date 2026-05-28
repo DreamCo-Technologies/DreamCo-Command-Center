@@ -125,8 +125,16 @@ export async function indexBots(): Promise<IndexResult> {
     byCategory[b.category] = (byCategory[b.category] ?? 0) + 1;
   }
 
+  // Deterministic insert/update accounting: read existing slugs up front so the
+  // metrics don't depend on timestamp resolution or clock skew.
+  const existingRows = await db.select({ slug: agentsTable.slug }).from(agentsTable);
+  const existing = new Set(existingRows.map((r) => r.slug.toLowerCase()));
   let inserted = 0;
   let updated = 0;
+  for (const b of bots) {
+    if (existing.has(b.slug.toLowerCase())) updated++;
+    else inserted++;
+  }
 
   const CHUNK = 50;
   for (let i = 0; i < bots.length; i += CHUNK) {
@@ -140,7 +148,7 @@ export async function indexBots(): Promise<IndexResult> {
       repoPath: b.repoPath,
       runtimeConfig: { category: b.category, division: b.division, indexedFrom: "Dreamcobots" },
     }));
-    const result = await db
+    await db
       .insert(agentsTable)
       .values(rows)
       .onConflictDoUpdate({
@@ -152,12 +160,7 @@ export async function indexBots(): Promise<IndexResult> {
           runtimeConfig: sql`excluded.runtime_config`,
           updatedAt: new Date(),
         },
-      })
-      .returning({ slug: agentsTable.slug, createdAt: agentsTable.createdAt, updatedAt: agentsTable.updatedAt });
-    for (const r of result) {
-      if (r.createdAt && r.updatedAt && Math.abs(r.createdAt.getTime() - r.updatedAt.getTime()) < 1000) inserted++;
-      else updated++;
-    }
+      });
   }
 
   const out: IndexResult = {

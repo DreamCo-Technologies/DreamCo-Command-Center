@@ -388,6 +388,10 @@ async function buildAllBots(): Promise<BotRow[]> {
     });
   }
 
+  // Normalized identity key so `foo` (folder) and `foo_bot` (indexed *_bot.py)
+  // collapse to the same logical bot and are never double-counted.
+  const normKey = (s: string): string => s.toLowerCase().replace(/_bot$/, "").replace(/[^a-z0-9]/g, "");
+
   const CONCURRENCY = 8;
   const results: BotRow[] = [];
   const seen = new Set<string>();
@@ -404,7 +408,7 @@ async function buildAllBots(): Promise<BotRow[]> {
     );
     for (const r of rows) {
       results.push(r);
-      seen.add(r.name.toLowerCase());
+      seen.add(normKey(r.name));
     }
   }
 
@@ -412,7 +416,7 @@ async function buildAllBots(): Promise<BotRow[]> {
   // that aren't already represented by a manifest/heuristic folder row.
   for (const agent of telemetry.agents.values()) {
     const key = agent.slug.toLowerCase();
-    if (seen.has(key)) continue;
+    if (seen.has(normKey(agent.slug))) continue;
     const cfg = (agent.runtimeConfig ?? {}) as Record<string, unknown>;
     const category = typeof cfg.category === "string" ? cfg.category : heuristicCategory(agent.slug);
     const division =
@@ -441,7 +445,7 @@ async function buildAllBots(): Promise<BotRow[]> {
       lastUpdate: agent.updatedAt ? agent.updatedAt.toISOString() : null,
       source: "manifest",
     });
-    seen.add(key);
+    seen.add(normKey(agent.slug));
   }
 
   return results;
