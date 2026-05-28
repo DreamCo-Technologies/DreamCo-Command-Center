@@ -5,15 +5,30 @@
  * DreamCo Command Center API
  * OpenAPI spec version: 0.1.0
  */
+import type { BotSource } from "./botSource";
 import type { BotStatus } from "./botStatus";
 import type { BotTier } from "./botTier";
 
 export interface Bot {
   name: string;
+  /** @nullable */
+  displayName?: string | null;
   repoPath?: string;
   status: BotStatus;
   tier: BotTier;
   category: string;
+  /**
+   * Division slug from bot.manifest.json (e.g. DreamFinance)
+   * @nullable
+   */
+  division?: string | null;
+  capabilities?: string[];
+  /** @nullable */
+  entrypoint?: string | null;
+  /** @nullable */
+  revenueModel?: string | null;
+  /** @nullable */
+  owner?: string | null;
   description?: string;
   /** @nullable */
   lastHeartbeat?: string | null;
@@ -21,4 +36,6 @@ export interface Bot {
   revenue?: number;
   /** @nullable */
   lastUpdate?: string | null;
+  /** Where this bot's metadata came from */
+  source: BotSource;
 }

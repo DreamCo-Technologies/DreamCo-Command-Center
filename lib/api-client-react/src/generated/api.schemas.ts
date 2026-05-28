@@ -5,6 +5,48 @@
  * DreamCo Command Center API
  * OpenAPI spec version: 0.1.0
  */
+export interface AuthUser {
+  id: string;
+  /** @nullable */
+  email: string | null;
+  /** @nullable */
+  firstName: string | null;
+  /** @nullable */
+  lastName: string | null;
+  /** @nullable */
+  profileImageUrl: string | null;
+}
+
+export interface AuthUserEnvelope {
+  user: AuthUser | null;
+}
+
+export interface MobileTokenExchangeRequest {
+  /** @minLength 1 */
+  code: string;
+  /** @minLength 1 */
+  code_verifier: string;
+  /** @minLength 1 */
+  redirect_uri: string;
+  /** @minLength 1 */
+  state: string;
+  /** @minLength 1 */
+  nonce?: string;
+}
+
+export interface MobileTokenExchangeSuccess {
+  token: string;
+}
+
+export const LogoutSuccessValue = {
+  success: true,
+} as const;
+export type LogoutSuccess = typeof LogoutSuccessValue;
+
+export interface ErrorEnvelope {
+  error: string;
+}
+
 export interface HealthStatus {
   status: string;
 }
@@ -30,12 +72,37 @@ export const BotTier = {
   ENTERPRISE: "ENTERPRISE",
 } as const;
 
+/**
+ * Where this bot's metadata came from
+ */
+export type BotSource = (typeof BotSource)[keyof typeof BotSource];
+
+export const BotSource = {
+  manifest: "manifest",
+  heuristic: "heuristic",
+  fallback: "fallback",
+} as const;
+
 export interface Bot {
   name: string;
+  /** @nullable */
+  displayName?: string | null;
   repoPath?: string;
   status: BotStatus;
   tier: BotTier;
   category: string;
+  /**
+   * Division slug from bot.manifest.json (e.g. DreamFinance)
+   * @nullable
+   */
+  division?: string | null;
+  capabilities?: string[];
+  /** @nullable */
+  entrypoint?: string | null;
+  /** @nullable */
+  revenueModel?: string | null;
+  /** @nullable */
+  owner?: string | null;
   description?: string;
   /** @nullable */
   lastHeartbeat?: string | null;
@@ -43,6 +110,8 @@ export interface Bot {
   revenue?: number;
   /** @nullable */
   lastUpdate?: string | null;
+  /** Where this bot's metadata came from */
+  source: BotSource;
 }
 
 export interface Repo {
@@ -160,6 +229,51 @@ export interface DashboardSummary {
   profitTargetMonthly?: number;
 }
 
+export interface BuildProgressSection {
+  name: string;
+  done: number;
+  total: number;
+}
+
+export type BuildProgressDetail = { [key: string]: unknown };
+
+export interface BuildProgress {
+  overallPercent: number;
+  sections: BuildProgressSection[];
+  detail?: BuildProgressDetail;
+}
+
+export interface BotRunResult {
+  ok: boolean;
+  name: string;
+  status: string;
+  invocations: number;
+  lastHeartbeat: string;
+  message?: string;
+}
+
+export interface CopilotPr {
+  number: number;
+  title: string;
+  url: string;
+  author: string;
+  createdAt: string;
+  /** @nullable */
+  mergeable: boolean | null;
+  /** @nullable */
+  mergeableState?: string | null;
+  /** True when PR touches exactly one bots/* dir with a valid manifest */
+  contractCompliant: boolean;
+  complianceReason?: string;
+  touchedDirs: string[];
+  manifestPresent?: boolean;
+}
+
+export interface CopilotRewriteResponse {
+  issueNumber: number;
+  issueUrl: string;
+}
+
 export interface Tier {
   name: string;
   priceMonthly: number;
@@ -167,3 +281,18 @@ export interface Tier {
   concurrentBots: number;
   models: string[];
 }
+
+/**
+ * Opaque session token — `Bearer <sid>`.
+ */
+export type AuthorizationSessionHeaderParameter = string;
+
+export type BeginBrowserLoginParams = {
+  returnTo?: string;
+};
+
+export type HandleBrowserLoginCallbackParams = {
+  code?: string;
+  state?: string;
+  iss?: string;
+};

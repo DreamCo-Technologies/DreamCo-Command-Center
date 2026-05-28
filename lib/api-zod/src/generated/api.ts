@@ -19,15 +19,27 @@ export const HealthCheckResponse = zod.object({
  */
 export const ListBotsResponseItem = zod.object({
   name: zod.string(),
+  displayName: zod.string().nullish(),
   repoPath: zod.string().optional(),
   status: zod.enum(["active", "idle", "error", "unknown"]),
   tier: zod.enum(["FREE", "PRO", "ENTERPRISE"]),
   category: zod.string(),
+  division: zod
+    .string()
+    .nullish()
+    .describe("Division slug from bot.manifest.json (e.g. DreamFinance)"),
+  capabilities: zod.array(zod.string()).optional(),
+  entrypoint: zod.string().nullish(),
+  revenueModel: zod.string().nullish(),
+  owner: zod.string().nullish(),
   description: zod.string().optional(),
   lastHeartbeat: zod.string().nullish(),
   pendingPRs: zod.number().optional(),
   revenue: zod.number().optional(),
   lastUpdate: zod.string().nullish(),
+  source: zod
+    .enum(["manifest", "heuristic", "fallback"])
+    .describe("Where this bot's metadata came from"),
 });
 export const ListBotsResponse = zod.array(ListBotsResponseItem);
 
@@ -40,15 +52,43 @@ export const GetBotParams = zod.object({
 
 export const GetBotResponse = zod.object({
   name: zod.string(),
+  displayName: zod.string().nullish(),
   repoPath: zod.string().optional(),
   status: zod.enum(["active", "idle", "error", "unknown"]),
   tier: zod.enum(["FREE", "PRO", "ENTERPRISE"]),
   category: zod.string(),
+  division: zod
+    .string()
+    .nullish()
+    .describe("Division slug from bot.manifest.json (e.g. DreamFinance)"),
+  capabilities: zod.array(zod.string()).optional(),
+  entrypoint: zod.string().nullish(),
+  revenueModel: zod.string().nullish(),
+  owner: zod.string().nullish(),
   description: zod.string().optional(),
   lastHeartbeat: zod.string().nullish(),
   pendingPRs: zod.number().optional(),
   revenue: zod.number().optional(),
   lastUpdate: zod.string().nullish(),
+  source: zod
+    .enum(["manifest", "heuristic", "fallback"])
+    .describe("Where this bot's metadata came from"),
+});
+
+/**
+ * @summary Trigger a manual run of a bot (records heartbeat + invocation)
+ */
+export const RunBotParams = zod.object({
+  name: zod.coerce.string(),
+});
+
+export const RunBotResponse = zod.object({
+  ok: zod.boolean(),
+  name: zod.string(),
+  status: zod.string(),
+  invocations: zod.number(),
+  lastHeartbeat: zod.string(),
+  message: zod.string().optional(),
 });
 
 /**
@@ -171,6 +211,40 @@ export const GetBuddyHistoryResponseItem = zod.object({
 export const GetBuddyHistoryResponse = zod.array(GetBuddyHistoryResponseItem);
 
 /**
+ * @summary List open Copilot PRs across Dreamcobots with contract compliance
+ */
+export const ListCopilotPrsResponseItem = zod.object({
+  number: zod.number(),
+  title: zod.string(),
+  url: zod.string(),
+  author: zod.string(),
+  createdAt: zod.string(),
+  mergeable: zod.boolean().nullable(),
+  mergeableState: zod.string().nullish(),
+  contractCompliant: zod
+    .boolean()
+    .describe(
+      "True when PR touches exactly one bots\/\* dir with a valid manifest",
+    ),
+  complianceReason: zod.string().optional(),
+  touchedDirs: zod.array(zod.string()),
+  manifestPresent: zod.boolean().optional(),
+});
+export const ListCopilotPrsResponse = zod.array(ListCopilotPrsResponseItem);
+
+/**
+ * @summary Ask Copilot to rewrite a PR to fit the bot contract
+ */
+export const RequestCopilotRewriteParams = zod.object({
+  prNumber: zod.coerce.number(),
+});
+
+export const RequestCopilotRewriteResponse = zod.object({
+  issueNumber: zod.number(),
+  issueUrl: zod.string(),
+});
+
+/**
  * @summary Overall dashboard stats
  */
 export const GetDashboardSummaryResponse = zod.object({
@@ -189,6 +263,21 @@ export const GetDashboardSummaryResponse = zod.object({
 });
 
 /**
+ * @summary Aggregated build completion across the system
+ */
+export const GetBuildProgressResponse = zod.object({
+  overallPercent: zod.number(),
+  sections: zod.array(
+    zod.object({
+      name: zod.string(),
+      done: zod.number(),
+      total: zod.number(),
+    }),
+  ),
+  detail: zod.record(zod.string(), zod.unknown()).optional(),
+});
+
+/**
  * @summary Subscription tier definitions
  */
 export const ListTiersResponseItem = zod.object({
@@ -199,3 +288,82 @@ export const ListTiersResponseItem = zod.object({
   models: zod.array(zod.string()),
 });
 export const ListTiersResponse = zod.array(ListTiersResponseItem);
+
+/**
+ * @summary Get the currently authenticated user
+ */
+export const GetCurrentAuthUserHeader = zod.object({
+  Authorization: zod
+    .string()
+    .optional()
+    .describe("Opaque session token — `Bearer <sid>`."),
+});
+
+export const GetCurrentAuthUserResponse = zod.object({
+  user: zod.union([
+    zod.object({
+      id: zod.string(),
+      email: zod.string().email().nullable(),
+      firstName: zod.string().nullable(),
+      lastName: zod.string().nullable(),
+      profileImageUrl: zod.string().nullable(),
+    }),
+    zod.null(),
+  ]),
+});
+
+/**
+ * @summary Start the browser OIDC login flow
+ */
+export const BeginBrowserLoginQueryParams = zod.object({
+  returnTo: zod.coerce.string().optional(),
+});
+
+/**
+ * @summary Complete the browser OIDC login flow
+ */
+export const HandleBrowserLoginCallbackQueryParams = zod.object({
+  code: zod.coerce.string().optional(),
+  state: zod.coerce.string().optional(),
+  iss: zod.coerce.string().url().optional(),
+});
+
+/**
+ * @summary Clear the session and begin OIDC logout
+ */
+export const LogoutBrowserSessionHeader = zod.object({
+  Authorization: zod
+    .string()
+    .optional()
+    .describe("Opaque session token — `Bearer <sid>`."),
+});
+
+/**
+ * @summary Exchange a mobile OIDC code for a session token
+ */
+
+export const ExchangeMobileAuthorizationCodeBody = zod.object({
+  code: zod.string().min(1),
+  code_verifier: zod.string().min(1),
+  redirect_uri: zod.string().url().min(1),
+  state: zod.string().min(1),
+  nonce: zod.string().min(1).optional(),
+});
+
+export const ExchangeMobileAuthorizationCodeResponse = zod.object({
+  token: zod.string(),
+});
+
+/**
+ * @summary Delete a mobile session token
+ */
+export const LogoutMobileSessionHeader = zod.object({
+  Authorization: zod
+    .string()
+    .optional()
+    .describe("Opaque session token — `Bearer <sid>`."),
+});
+
+export const LogoutMobileSessionResponse = zod.object({
+  success: zod.boolean(),
+});
