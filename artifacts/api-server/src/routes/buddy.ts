@@ -101,13 +101,13 @@ const sessions = new Map<string, Array<{ id: string; role: string; content: stri
 const BUDDY_SYSTEM_PROMPT = `You are Buddy, DreamCo's master AI orchestrator and the brain of the DreamCo Command Center OS.
 
 CONNECTED SYSTEMS (live integrations):
-- GitHub: DreamCo-Technologies org — Dreamcobots (171 bots), DreamCo-Command-Center, Ai-bots, demo-repository
+- GitHub: DreamCo-Technologies org — Dreamcobots (the bot fleet repo), DreamCo-Command-Center, Ai-bots, demo-repository
 - Database: Postgres with ontology tables — agents, divisions, capabilities, workflows, events, agent_inheritance, agent_capabilities
 - Stripe: revenue attribution by bot via charge.metadata.bot + product.metadata.bot
 - OpenAI / Anthropic / Gemini: routed via Replit AI Integrations proxy
 - Internal API endpoints you can reference: /api/bots, /api/bots/:name, /api/bots/:name/run (manual trigger), /api/dashboard/build-progress, /api/dashboard/tiers, /api/copilot/prs, /api/github/repos, /api/github/commits, /api/stripe/revenue, /api/stripe/subscriptions, /api/buddy/chat, /api/buddy/history, /api/health
 
-BOT FLEET (171 total, grouped by division):
+BOT FLEET (grouped by division below; for the EXACT live count and full list, cite /api/bots — never state a specific total from memory):
 - DreamAI: buddy_bot, god_bot, god_mode_bot, space_ai_bot, quantum_ai_bot, quantum_decision_bot, voice_replicator_bot
 - DreamFinance: stripe_integration, stripe_payment_bot, stripe_key_rotation_bot, token_billing, stock_trading_bot, wealth_system_bot, stack_and_profit_bot
 - DreamSalesPro: lead_gen_bot, social_media_bot, social_media_manager_bot, email_campaign_manager_bot, influencer_bot, shopify_automation_bot, OutreachBot, CloserBot, FollowUpBot, EnrichmentBot, LeadGenBot
@@ -151,12 +151,19 @@ async function callAI(messages: Array<{ role: string; content: string }>, userId
         body: JSON.stringify({
           model: "gpt-5-mini",
           messages: [{ role: "system", content: BUDDY_SYSTEM_PROMPT + sourcesContext + memoryContext }, ...messages],
-          max_tokens: 800,
-          temperature: 0.7,
+          max_completion_tokens: 2000,
         }),
       });
+      if (!res.ok) {
+        const text = await res.text().catch(() => "");
+        logger.warn({ status: res.status, body: text.slice(0, 300) }, "AI call returned non-OK, using fallback");
+        return fallbackResponse(messages[messages.length - 1]?.content ?? "");
+      }
       const data = await res.json() as { choices?: Array<{ message?: { content?: string } }> };
-      return data.choices?.[0]?.message?.content ?? fallbackResponse(messages[messages.length - 1]?.content ?? "");
+      const content = data.choices?.[0]?.message?.content?.trim();
+      if (content) return content;
+      logger.warn({ data }, "AI call returned empty content, using fallback");
+      return fallbackResponse(messages[messages.length - 1]?.content ?? "");
     } catch (err) {
       logger.warn({ err }, "AI call failed, using fallback");
     }
@@ -165,34 +172,13 @@ async function callAI(messages: Array<{ role: string; content: string }>, userId
   return fallbackResponse(messages[messages.length - 1]?.content ?? "");
 }
 
-function fallbackResponse(input: string): string {
-  const lower = input.toLowerCase();
-
-  if (lower.includes("revenue") || lower.includes("money") || lower.includes("stripe")) {
-    return "Current revenue tracking: Daily target $500, Weekly $3,500, Monthly $15,000. Stripe integration is active across the platform. The stripe_integration, stripe_payment_bot, and token_billing bots are all monitoring payment flows. Connect your Stripe key in settings to see live metrics.";
-  }
-  if (lower.includes("bot") && (lower.includes("how many") || lower.includes("total") || lower.includes("count"))) {
-    return "The DreamCo ecosystem currently has 100+ registered bots across categories including Finance, Marketing, Real Estate, AI Research, SaaS, Legal, Government, and Automation. The Dreamcobots repository is the central registry for all bot source code.";
-  }
-  if (lower.includes("github") || lower.includes("repo") || lower.includes("commit")) {
-    return "I'm monitoring 4 repositories under DreamCo-Technologies: Dreamcobots (100+ bots), Dreamco (AI bot creation), Ai-bots (ChatGPT integrations), and demo-repository. All commits, PRs, and deployments are tracked in real-time through the GitHub API.";
-  }
-  if (lower.includes("buddy") || lower.includes("who are you") || lower.includes("what are you")) {
-    return "I'm Buddy — DreamCo's master AI orchestrator. I'm not just a chatbot. I'm the command center brain: I coordinate all 100+ bots, monitor revenue streams, track GitHub activity, manage workflows, and provide strategic intelligence for the entire DreamCo ecosystem. Think of me as Jarvis for DreamCo.";
-  }
-  if (lower.includes("tier") || lower.includes("plan") || lower.includes("subscription") || lower.includes("pro") || lower.includes("enterprise")) {
-    return "DreamCo offers three tiers: FREE ($0/mo — 500 requests, 2 concurrent bots), PRO ($49/mo — 10,000 requests, 10 concurrent bots, GPT-4 access), and ENTERPRISE ($299/mo — unlimited requests, 50 concurrent bots, all models including GPT-4 Vision and Claude). Which tier would you like to know more about?";
-  }
-  if (lower.includes("division") || lower.includes("real estate") || lower.includes("sales")) {
-    return "DreamCo currently has two active divisions: DreamRealEstate (handling foreclosure finders, home buyer bots, rental cashflow simulators) and DreamSalesPro (managing lead generation, sales pipeline automation, and CRM bots). Each division has dedicated bots and performance dashboards.";
-  }
-  if (lower.includes("hello") || lower.includes("hi") || lower.includes("hey")) {
-    return "Hello! I'm Buddy, your DreamCo Command Center AI. I have full visibility into all your bots, revenue metrics, GitHub activity, and system health. What would you like to know or orchestrate today?";
-  }
-  if (lower.includes("help") || lower.includes("what can you do")) {
-    return "I can help you with:\n• Bot status and management across all 100+ DreamCo bots\n• Revenue tracking (Stripe metrics, subscription management)\n• GitHub repo monitoring (commits, PRs, deployments)\n• Division performance (DreamRealEstate, DreamSalesPro)\n• Workflow orchestration and automation\n• Tier and billing management\n• Strategic recommendations for scaling your bot ecosystem\n\nWhat would you like to explore?";
-  }
-  return `I'm processing your request about "${input}". As your DreamCo Command Center AI, I have full access to all bot systems, revenue data, and repository intelligence. Could you be more specific about what you'd like to know or action you'd like to take?`;
+/**
+ * Honest degradation. We intentionally do NOT fabricate specifics (bot counts,
+ * revenue figures, divisions) here — when the language model is unreachable we
+ * say so plainly and point the operator at the live dashboard data instead.
+ */
+function fallbackResponse(_input: string): string {
+  return "⚠️ Buddy's AI core is offline — the language model isn't reachable right now, so I can't generate a real answer. This is an honest status message, not a scripted reply. Your live data is still accurate on the dashboard: Bots, Revenue, GitHub, and System pages all read from real sources. Please try again in a moment.";
 }
 
 function detectEmotion(text: string): string {
@@ -227,7 +213,12 @@ router.post("/buddy/chat", async (req, res): Promise<void> => {
   const userId = req.user?.id;
   const noteCaptured = await maybeCaptureNote(message, sid, userId);
 
-  const messages = history.slice(-10).map((m) => ({ role: m.role, content: m.content }));
+  // Normalize internal roles to the OpenAI chat schema (user | assistant).
+  // Stored Buddy turns use role "buddy", which the API rejects on multi-turn calls.
+  const messages = history.slice(-10).map((m) => ({
+    role: m.role === "buddy" ? ("assistant" as const) : ("user" as const),
+    content: m.content,
+  }));
 
   try {
     const reply = await callAI(messages, userId);

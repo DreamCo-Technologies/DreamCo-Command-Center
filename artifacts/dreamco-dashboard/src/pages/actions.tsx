@@ -73,10 +73,11 @@ export default function ActionsPage() {
     onError: (e) => setBotResult(`✗ ${String(e)}`),
   });
 
-  const fav = ["buddy_bot", "stripe_payment_bot", "lead_gen_bot", "social_media_bot", "real_estate_bot", "stock_trading_bot"];
+  // Quick-test shortcuts derived from the real indexed fleet (no hardcoded names).
+  const fav = (bots.data ?? []).slice(0, 6).map(b => b.name);
 
   const TILES: Tile[] = [
-    { id: "chat", title: "Chat", icon: <MessageCircle className="h-5 w-5" />, status: "live", blurb: "Buddy multi-turn chat (GPT-5).", href: "/buddy", metric: "active" },
+    { id: "chat", title: "Chat", icon: <MessageCircle className="h-5 w-5" />, status: "live", blurb: "Buddy multi-turn chat (gpt-5-mini).", href: "/buddy", metric: "active" },
     { id: "empire", title: "Empire HQ", icon: <Building2 className="h-5 w-5" />, status: "live", blurb: "Executive dashboard — KPIs & targets.", href: "/dashboard", metric: summary.data ? `$${summary.data.dailyRevenue.toFixed(0)} today / $${summary.data.dailyTarget} tgt` : "—" },
     { id: "divisions", title: "Divisions", icon: <Network className="h-5 w-5" />, status: "live", blurb: "Bot groupings by business division.", href: "/divisions", metric: summary.data ? `${summary.data.totalBots} bots` : "—" },
     { id: "fleet", title: "Bot Fleet", icon: <BotIcon className="h-5 w-5" />, status: "live", blurb: "Full indexed fleet, Run buttons live.", href: "/bots", metric: summary.data ? `${summary.data.activeBots} active / ${summary.data.totalBots}` : "—" },

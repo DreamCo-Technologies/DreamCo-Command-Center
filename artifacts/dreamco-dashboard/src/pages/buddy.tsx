@@ -12,6 +12,7 @@ export default function Buddy() {
   const [message, setMessage] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
   const voice = useDreamcoVoice();
+  const [lastLatencyMs, setLastLatencyMs] = useState<number | null>(null);
 
   const { data: history, isLoading } = useGetBuddyHistory({
     query: { queryKey: getGetBuddyHistoryQueryKey() }
@@ -44,8 +45,10 @@ export default function Buddy() {
     // Add user message immediately
     setLocalMessages(prev => [...prev, { role: 'user', content: newMsg }]);
 
+    const t0 = performance.now();
     sendMessage.mutate({ data: { message: newMsg, sessionId } }, {
       onSuccess: (res) => {
+        setLastLatencyMs(Math.round(performance.now() - t0));
         setLocalMessages(prev => [...prev, { role: 'buddy', content: res.message, emotion: res.emotion }]);
         if (voice.enabled) voice.speak(res.message);
       },
@@ -129,15 +132,19 @@ export default function Buddy() {
                 <div className="space-y-2">
                   <div className="flex justify-between items-center text-xs font-mono">
                     <span className="text-muted-foreground">Logic Engine</span>
-                    <span className="text-primary">GPT-4.5</span>
+                    <span className="text-primary">gpt-5-mini</span>
                   </div>
                   <div className="flex justify-between items-center text-xs font-mono">
-                    <span className="text-muted-foreground">Response Latency</span>
-                    <span className="text-primary">42ms</span>
+                    <span className="text-muted-foreground">Last Response</span>
+                    <span className="text-primary">{lastLatencyMs !== null ? `${lastLatencyMs}ms` : "—"}</span>
                   </div>
                   <div className="flex justify-between items-center text-xs font-mono">
-                    <span className="text-muted-foreground">Memory Buffer</span>
-                    <span className="text-primary">256MB</span>
+                    <span className="text-muted-foreground">Session Msgs</span>
+                    <span className="text-primary">{localMessages.length}</span>
+                  </div>
+                  <div className="flex justify-between items-center text-xs font-mono">
+                    <span className="text-muted-foreground">Voice</span>
+                    <span className="text-primary">{voice.supported ? (voice.enabled ? "On" : "Off") : "N/A"}</span>
                   </div>
                 </div>
               </div>
