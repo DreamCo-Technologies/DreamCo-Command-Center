@@ -31,6 +31,7 @@ import PricingPage from "@/pages/pricing";
 import TimeCapsulePage from "@/pages/time-capsule";
 import CostsPage from "@/pages/costs";
 import AutonomyPage from "@/pages/autonomy";
+import SourcesPage from "@/pages/sources";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -74,6 +75,8 @@ function Router() {
         <Route path="/loans" component={LoansPage} />
         <Route path="/pricing" component={PricingPage} />
         <Route path="/time-capsule" component={TimeCapsulePage} />
+        <Route path="/sources" component={SourcesPage} />
+        <Route path="/ai-sources" component={SourcesPage} />
         <Route path="/costs" component={CostsPage} />
         <Route path="/autonomy" component={AutonomyPage} />
         <Route component={NotFound} />

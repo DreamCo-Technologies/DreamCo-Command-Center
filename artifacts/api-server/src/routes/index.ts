@@ -10,6 +10,8 @@ import authRouter from "./auth";
 import earningsRouter from "./earnings";
 import vibeRouter from "./vibe";
 import buddyCapabilitiesRouter from "./buddyCapabilities";
+import snapshotsRouter from "./snapshots";
+import sourcesRouter from "./sources";
 
 const router: IRouter = Router();
 
@@ -24,5 +26,7 @@ router.use(authRouter);
 router.use(earningsRouter);
 router.use(vibeRouter);
 router.use(buddyCapabilitiesRouter);
+router.use(snapshotsRouter);
+router.use(sourcesRouter);
 
 export default router;

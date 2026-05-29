@@ -59,6 +59,7 @@ const navGroups: { label: string; items: { title: string; url: string; icon: typ
       { title: "Deal Analyzer", url: "/deals", icon: BarChart3 },
       { title: "Formula Vault", url: "/formulas", icon: FlaskConical },
       { title: "Learning Matrix", url: "/learning-matrix", icon: GraduationCap },
+      { title: "AI Sources", url: "/sources", icon: Network },
       { title: "AI Leaders", url: "/ai-leaders", icon: Brain },
       { title: "AI Models Hub", url: "/ai-models", icon: LayoutGrid },
       { title: "AI Ecosystem", url: "/ecosystem", icon: Globe },

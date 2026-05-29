@@ -9,3 +9,5 @@ export * from "./bot_manifest";
 export * from "./auth";
 export * from "./bot_runs";
 export * from "./vibe";
+export * from "./snapshots";
+export * from "./ai_sources";

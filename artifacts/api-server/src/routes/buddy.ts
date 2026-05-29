@@ -1,8 +1,49 @@
 import { Router, type IRouter } from "express";
 import { randomUUID } from "crypto";
 import { logger } from "../lib/logger";
+import { db, aiSourcesTable } from "@workspace/db";
+import { desc } from "drizzle-orm";
 
 const router: IRouter = Router();
+
+// Cache the indexed AI-sources catalog so Buddy knows what it can route to and
+// learn from, without a DB hit on every message. Refreshed every few minutes.
+let sourcesCache: { at: number; text: string } | null = null;
+const SOURCES_TTL_MS = 5 * 60_000;
+
+async function buildSourcesContext(): Promise<string> {
+  if (sourcesCache && Date.now() - sourcesCache.at < SOURCES_TTL_MS) return sourcesCache.text;
+  let text = "";
+  try {
+    const rows = await db
+      .select({ name: aiSourcesTable.name, role: aiSourcesTable.role, repoPath: aiSourcesTable.repoPath, signals: aiSourcesTable.signals })
+      .from(aiSourcesTable)
+      .orderBy(desc(aiSourcesTable.sizeBytes));
+    if (rows.length > 0) {
+      let totalModels = 0;
+      let totalUseCases = 0;
+      for (const r of rows) {
+        const s = (r.signals ?? {}) as Record<string, unknown>;
+        totalModels += Number(s.models ?? 0);
+        totalUseCases += Number(s.useCases ?? 0);
+      }
+      const lines = rows.slice(0, 30).map((r) => {
+        const s = (r.signals ?? {}) as Record<string, unknown>;
+        const extra = [
+          Number(s.models ?? 0) ? `${s.models} models` : "",
+          Number(s.useCases ?? 0) ? `${s.useCases} use-cases` : "",
+          Number(s.functions ?? 0) ? `${s.functions} fns` : "",
+        ].filter(Boolean).join(", ");
+        return `  - [${r.role}] ${r.repoPath}${extra ? ` (${extra})` : ""}`;
+      });
+      text = `\n\nGLOBAL AI SOURCES (indexed from Dreamcobots — you can reason about, route to, and write prompts for these real modules):\nTotals: ${rows.length} source modules, ${totalModels} model entries, ${totalUseCases} use-case entries.\n${lines.join("\n")}\nWhen a task maps to one of these, name the exact module path and describe how you'd route the request (e.g. via task_router / model_router). Never claim to have executed a Python module you cannot call — describe the routing plan honestly.`;
+    }
+  } catch (err) {
+    logger.warn({ err }, "could not load AI sources for Buddy context");
+  }
+  sourcesCache = { at: Date.now(), text };
+  return text;
+}
 
 // In-memory chat history (per session)
 const sessions = new Map<string, Array<{ id: string; role: string; content: string; timestamp: string; emotion: string | null }>>();
@@ -49,6 +90,7 @@ async function callAI(messages: Array<{ role: string; content: string }>): Promi
 
   if (baseUrl && apiKey) {
     try {
+      const sourcesContext = await buildSourcesContext();
       const res = await fetch(`${baseUrl}/chat/completions`, {
         method: "POST",
         headers: {
@@ -57,7 +99,7 @@ async function callAI(messages: Array<{ role: string; content: string }>): Promi
         },
         body: JSON.stringify({
           model: "gpt-5-mini",
-          messages: [{ role: "system", content: BUDDY_SYSTEM_PROMPT }, ...messages],
+          messages: [{ role: "system", content: BUDDY_SYSTEM_PROMPT + sourcesContext }, ...messages],
           max_tokens: 800,
           temperature: 0.7,
         }),
