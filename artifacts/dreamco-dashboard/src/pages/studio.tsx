@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Clapperboard, Image as ImageIcon, Mic, Music, Video, Megaphone, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useDreamcoVoice } from "@/lib/speech";
 
 async function api<T>(path: string, init?: RequestInit): Promise<T> {
   const r = await fetch(`/api${path}`, {
@@ -70,6 +71,7 @@ export default function StudioPage() {
   const [kind, setKind] = useState<Kind>("image");
   const [prompt, setPrompt] = useState("");
   const [consent, setConsent] = useState(false);
+  const voice = useDreamcoVoice();
 
   const { data: capsData } = useQuery<CapsResponse>({ queryKey: ["media-caps"], queryFn: () => api("/media/capabilities") });
   const { data: jobsData, isError: jobsError } = useQuery<JobsResponse>({ queryKey: ["media-jobs"], queryFn: () => api("/media/jobs"), retry: false });
@@ -165,8 +167,26 @@ export default function StudioPage() {
             {gen.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
             {gen.isPending ? "Generating…" : `Generate ${KIND_META[kind].label}`}
           </Button>
+          {kind === "voice" && voice.supported && (
+            <Button
+              type="button"
+              variant="outline"
+              className="font-mono"
+              disabled={!prompt.trim()}
+              onClick={() => (voice.speaking ? voice.stop() : voice.speak(prompt))}
+              title="Preview instantly in your browser with the free built-in DreamCo Voice (no key needed)"
+            >
+              {voice.speaking ? "Stop preview" : "Preview (DreamCo Voice)"}
+            </Button>
+          )}
           {!consent && <span className="text-[10px] font-mono text-amber-400">Consent required to enable.</span>}
         </div>
+        {kind === "voice" && voice.supported && (
+          <p className="text-[10px] font-mono text-muted-foreground">
+            Preview uses the free built-in DreamCo Voice (your browser). The Generate button produces a downloadable
+            audio file via our self-hosted DreamCo Voice Pro engine when configured.
+          </p>
+        )}
 
         {genErr && (
           <div className="rounded-md border border-amber-400/30 bg-amber-400/5 p-3 text-xs font-mono text-amber-300">

@@ -4,12 +4,14 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Terminal, Send, Cpu, Network, Database, Shield, Zap } from "lucide-react";
+import { Terminal, Send, Cpu, Network, Zap, Volume2, VolumeX, Square } from "lucide-react";
+import { useDreamcoVoice } from "@/lib/speech";
 
 export default function Buddy() {
   const [sessionId] = useState(() => `session-${Math.random().toString(36).substring(2, 9)}`);
   const [message, setMessage] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
+  const voice = useDreamcoVoice();
 
   const { data: history, isLoading } = useGetBuddyHistory({
     query: { queryKey: getGetBuddyHistoryQueryKey() }
@@ -45,6 +47,7 @@ export default function Buddy() {
     sendMessage.mutate({ data: { message: newMsg, sessionId } }, {
       onSuccess: (res) => {
         setLocalMessages(prev => [...prev, { role: 'buddy', content: res.message, emotion: res.emotion }]);
+        if (voice.enabled) voice.speak(res.message);
       },
       onError: () => {
         setLocalMessages(prev => [...prev, { role: 'buddy', content: "SYSTEM ERROR: Connection to neural core failed.", emotion: "error" }]);
@@ -72,6 +75,46 @@ export default function Buddy() {
         <p className="text-muted-foreground font-mono text-sm uppercase tracking-wider">
           Neural Interface Active // Session ID: {sessionId}
         </p>
+
+        {voice.supported && (
+          <div className="flex flex-wrap items-center gap-2 mt-1">
+            <Button
+              type="button"
+              size="sm"
+              variant={voice.enabled ? "default" : "outline"}
+              onClick={() => { if (voice.enabled) voice.stop(); voice.setEnabled(!voice.enabled); }}
+              className="font-mono text-xs h-8 gap-2"
+              title="DreamCo Voice — Buddy speaks replies aloud (free, built-in, no third party)"
+            >
+              {voice.enabled ? <Volume2 className="h-3.5 w-3.5" /> : <VolumeX className="h-3.5 w-3.5" />}
+              {voice.enabled ? "DreamCo Voice: ON" : "DreamCo Voice: OFF"}
+            </Button>
+
+            {voice.enabled && (
+              <>
+                <select
+                  value={voice.voiceURI}
+                  onChange={(e) => voice.setVoiceURI(e.target.value)}
+                  className="h-8 rounded-md border border-border/50 bg-card px-2 font-mono text-xs text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary/50 max-w-[220px]"
+                  title="Choose Buddy's voice"
+                >
+                  <option value="">System default</option>
+                  {voice.voices.map((v) => (
+                    <option key={v.voiceURI} value={v.voiceURI}>
+                      {v.name} ({v.lang})
+                    </option>
+                  ))}
+                </select>
+
+                {voice.speaking && (
+                  <Button type="button" size="sm" variant="ghost" onClick={voice.stop} className="font-mono text-xs h-8 gap-2 text-destructive">
+                    <Square className="h-3.5 w-3.5" /> Stop
+                  </Button>
+                )}
+              </>
+            )}
+          </div>
+        )}
       </div>
 
       <div className="flex flex-col lg:flex-row gap-6 flex-1 min-h-0">

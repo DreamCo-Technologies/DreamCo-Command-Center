@@ -8,9 +8,12 @@
  * returns an explicit error telling the operator exactly which secret to add.
  *
  * Currently LIVE without extra setup: image generation via the Replit-managed
- * OpenAI integration (AI_INTEGRATIONS_OPENAI_*). Voice (ElevenLabs), music
- * (Suno), and video (Runway/Kling/Pika) are wired and activate the moment their
- * key is added.
+ * OpenAI integration (AI_INTEGRATIONS_OPENAI_*). Voice is OWNED by DreamCo: the
+ * built-in browser voice (frontend) already lets Buddy talk for free, and the
+ * self-hosted DreamCo Voice Pro engine (DREAMCO_VOICE_URL) produces server-side
+ * audio — ElevenLabs is only an optional fallback if a key is set. Music (Suno)
+ * and video (Runway/Kling/Pika) are wired and activate the moment their key is
+ * added.
  */
 
 export type MediaKind = "image" | "voice" | "music" | "video" | "commercial";
@@ -51,8 +54,17 @@ function capStatus(implemented: boolean, hasKey: boolean): CapabilityStatus {
 function hasOpenAI(): boolean {
   return !!(process.env.AI_INTEGRATIONS_OPENAI_API_KEY && process.env.AI_INTEGRATIONS_OPENAI_BASE_URL);
 }
-function hasVoice(): boolean {
+// DreamCo Voice Pro: our own self-hosted neural TTS service (open-source model,
+// not a competitor API). Activates when DREAMCO_VOICE_URL points at the service.
+function hasSelfHostedVoice(): boolean {
+  return !!process.env.DREAMCO_VOICE_URL;
+}
+function hasElevenLabs(): boolean {
   return !!process.env.ELEVENLABS_API_KEY;
+}
+// Server-side voice is available via our own engine OR (optional) ElevenLabs fallback.
+function hasVoice(): boolean {
+  return hasSelfHostedVoice() || hasElevenLabs();
 }
 function hasMusic(): boolean {
   return !!process.env.SUNO_API_KEY;
@@ -90,11 +102,17 @@ export function getCapabilities(): Capability[] {
     {
       kind: "voice",
       status: voiceStatus,
-      provider: "ElevenLabs",
-      envVar: "ELEVENLABS_API_KEY",
-      note: voice
-        ? "Live. Text-to-speech / voice mimicry via ElevenLabs. Consent + authorization required per request."
-        : "Add ELEVENLABS_API_KEY to enable voice / voice cloning. Requires explicit consent per request.",
+      provider: hasSelfHostedVoice()
+        ? "DreamCo Voice Pro (self-hosted)"
+        : hasElevenLabs()
+          ? "ElevenLabs (fallback)"
+          : "DreamCo Voice Pro (self-hosted)",
+      envVar: "DREAMCO_VOICE_URL",
+      note: hasSelfHostedVoice()
+        ? "Live. Server-side audio via our own self-hosted DreamCo Voice Pro engine. Consent + authorization required per request."
+        : hasElevenLabs()
+          ? "Live via the optional ElevenLabs fallback. For a fully-owned engine, set DREAMCO_VOICE_URL to your self-hosted DreamCo Voice Pro service."
+          : "Buddy already talks in-browser with the free built-in DreamCo Voice. For downloadable server-side audio, set DREAMCO_VOICE_URL (self-hosted, owned) — or optionally ELEVENLABS_API_KEY as a fallback.",
     },
     {
       kind: "music",
@@ -162,11 +180,47 @@ async function generateImage(prompt: string): Promise<GenerateResult> {
   return { provider: "OpenAI dall-e-3", resultUrl: url, meta: { note: "Provider-hosted URL; expires after ~1h. Persist to object storage for permanent assets." } };
 }
 
-/** ElevenLabs TTS / voice mimicry. Wired; activates when ELEVENLABS_API_KEY is set. */
+/**
+ * Server-side voice. Prefers our OWN self-hosted DreamCo Voice Pro engine
+ * (DREAMCO_VOICE_URL — an open-source neural TTS service we control), and falls
+ * back to ElevenLabs only if explicitly configured. Returns audio as a data URL.
+ */
 async function generateVoice(prompt: string, params: Record<string, unknown>): Promise<GenerateResult> {
+  const selfUrl = process.env.DREAMCO_VOICE_URL;
   const apiKey = process.env.ELEVENLABS_API_KEY;
-  if (!apiKey) throw new NeedsKeyError("voice", "ELEVENLABS_API_KEY", "ElevenLabs");
-  const voiceId = (params.voiceId as string) || "21m00Tcm4TlvDq8ikWAM"; // ElevenLabs default voice
+  if (selfUrl) {
+    try {
+      const headers: Record<string, string> = { "content-type": "application/json", accept: "audio/mpeg" };
+      if (process.env.DREAMCO_VOICE_API_KEY) headers.authorization = `Bearer ${process.env.DREAMCO_VOICE_API_KEY}`;
+      const res = await fetch(selfUrl, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ text: prompt, voice: params.voiceId, ...params }),
+      });
+      if (!res.ok) {
+        const text = await res.text().catch(() => "");
+        throw new Error(`DreamCo Voice Pro error ${res.status}: ${text.slice(0, 300)}`);
+      }
+      const ct = res.headers.get("content-type") ?? "";
+      if (ct.includes("application/json")) {
+        const j = (await res.json()) as { url?: string; audio?: string; audioBase64?: string; format?: string };
+        if (j.url) return { provider: "DreamCo Voice Pro (self-hosted)", resultUrl: j.url };
+        const b64 = j.audio ?? j.audioBase64;
+        if (b64) return { provider: "DreamCo Voice Pro (self-hosted)", resultUrl: `data:audio/${j.format ?? "mpeg"};base64,${b64}` };
+        throw new Error("DreamCo Voice Pro returned no audio");
+      }
+      const buf = Buffer.from(await res.arrayBuffer());
+      return { provider: "DreamCo Voice Pro (self-hosted)", resultUrl: `data:${ct || "audio/mpeg"};base64,${buf.toString("base64")}`, meta: { bytes: buf.length } };
+    } catch (err) {
+      // Runtime failover: if our self-hosted engine is down but an ElevenLabs
+      // key is configured, fall through to it rather than hard-failing.
+      if (!apiKey) throw err;
+    }
+  }
+
+  // Optional fallback: ElevenLabs (only if the operator opts in with a key).
+  if (!apiKey) throw new NeedsKeyError("voice", "DREAMCO_VOICE_URL", "DreamCo Voice Pro (self-hosted)");
+  const voiceId = (params.voiceId as string) || "21m00Tcm4TlvDq8ikWAM";
   const res = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
     method: "POST",
     headers: { "xi-api-key": apiKey, "content-type": "application/json", accept: "audio/mpeg" },
@@ -178,7 +232,7 @@ async function generateVoice(prompt: string, params: Record<string, unknown>): P
   }
   const buf = Buffer.from(await res.arrayBuffer());
   const dataUrl = `data:audio/mpeg;base64,${buf.toString("base64")}`;
-  return { provider: "ElevenLabs", resultUrl: dataUrl, meta: { voiceId, bytes: buf.length } };
+  return { provider: "ElevenLabs (fallback)", resultUrl: dataUrl, meta: { voiceId, bytes: buf.length } };
 }
 
 /** Suno music generation. Wired; activates when SUNO_API_KEY is set. */
