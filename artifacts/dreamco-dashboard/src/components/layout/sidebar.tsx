@@ -29,6 +29,7 @@ import {
   Wallet,
   Cpu,
   Atom,
+  Clapperboard,
 } from "lucide-react";
 import {
   Sidebar,
@@ -63,6 +64,7 @@ const navGroups: { label: string; items: { title: string; url: string; icon: typ
       { title: "AI Sources", url: "/sources", icon: Network },
       { title: "Buddy Memory", url: "/memory", icon: Brain },
       { title: "Quantum", url: "/quantum", icon: Atom },
+      { title: "Studio", url: "/studio", icon: Clapperboard },
       { title: "AI Leaders", url: "/ai-leaders", icon: Brain },
       { title: "AI Models Hub", url: "/ai-models", icon: LayoutGrid },
       { title: "AI Ecosystem", url: "/ecosystem", icon: Globe },

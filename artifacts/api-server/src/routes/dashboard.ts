@@ -1,5 +1,6 @@
 import { Router, type IRouter } from "express";
 import { logger } from "../lib/logger";
+import { getStripeClient } from "../lib/stripeClient";
 
 const router: IRouter = Router();
 
@@ -33,17 +34,44 @@ router.get("/dashboard/summary", async (req, res): Promise<void> => {
     const activeBots = Math.floor(totalBots * 0.65);
     const idleBots = totalBots - activeBots;
 
+    // Real revenue + subscriptions from Stripe when connected; honest zeros otherwise.
+    let dailyRevenue = 0;
+    let monthlyRevenue = 0;
+    let totalSubscriptions = 0;
+    let revenueConnected = false;
+    try {
+      // Financial figures are only computed for authenticated callers — never
+      // expose revenue / subscription counts to anonymous requests.
+      const stripe = req.user ? await getStripeClient() : null;
+      if (stripe) {
+        revenueConnected = true;
+        const now = Math.floor(Date.now() / 1000);
+        const [dayCharges, monthCharges, subs] = await Promise.all([
+          stripe.charges.list({ created: { gte: now - 86400 }, limit: 100 }),
+          stripe.charges.list({ created: { gte: now - 2592000 }, limit: 100 }),
+          stripe.subscriptions.list({ status: "active", limit: 100 }),
+        ]);
+        const sum = (c: typeof dayCharges) =>
+          c.data.filter((x) => x.status === "succeeded").reduce((a, x) => a + x.amount, 0) / 100;
+        dailyRevenue = sum(dayCharges);
+        monthlyRevenue = sum(monthCharges);
+        totalSubscriptions = subs.data.length;
+      }
+    } catch (err) {
+      req.log.error({ err }, "dashboard revenue fetch failed");
+    }
+
     res.json({
       totalBots,
       activeBots,
       idleBots,
       totalRepos: 4,
-      dailyRevenue: 312.50,
-      monthlyRevenue: 8640.25,
+      dailyRevenue,
+      monthlyRevenue,
       dailyTarget: 500,
       monthlyTarget: 15000,
-      totalSubscriptions: 3,
-      recentCommits: 47,
+      totalSubscriptions,
+      revenueConnected,
       profitTargetDaily: 500,
       profitTargetMonthly: 15000,
     });

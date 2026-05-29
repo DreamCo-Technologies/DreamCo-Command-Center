@@ -14,6 +14,7 @@ import snapshotsRouter from "./snapshots";
 import sourcesRouter from "./sources";
 import memoryRouter from "./memory";
 import quantumRouter from "./quantum";
+import mediaRouter from "./media";
 
 const router: IRouter = Router();
 
@@ -32,5 +33,6 @@ router.use(snapshotsRouter);
 router.use(sourcesRouter);
 router.use(memoryRouter);
 router.use(quantumRouter);
+router.use(mediaRouter);
 
 export default router;

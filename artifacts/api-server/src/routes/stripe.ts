@@ -1,5 +1,6 @@
 import { Router, type IRouter } from "express";
 import { getStripeClient } from "../lib/stripeClient";
+import { requireAuth } from "../middlewares/authMiddleware";
 
 const router: IRouter = Router();
 
@@ -8,17 +9,16 @@ const DAILY_TARGET = 500;
 const WEEKLY_TARGET = 3500;
 const MONTHLY_TARGET = 15000;
 
-router.get("/stripe/revenue", async (req, res): Promise<void> => {
+router.get("/stripe/revenue", requireAuth, async (req, res): Promise<void> => {
   const stripe = await getStripeClient();
 
   if (!stripe) {
-    // Return demo data when Stripe not connected
-    const now = Date.now();
+    // Honest: no Stripe key => no revenue data. Show real zeros, not demo numbers.
     res.json({
-      totalRevenue: 24850.75,
-      dailyRevenue: 312.50,
-      weeklyRevenue: 2187.00,
-      monthlyRevenue: 8640.25,
+      totalRevenue: 0,
+      dailyRevenue: 0,
+      weeklyRevenue: 0,
+      monthlyRevenue: 0,
       dailyTarget: DAILY_TARGET,
       weeklyTarget: WEEKLY_TARGET,
       monthlyTarget: MONTHLY_TARGET,
@@ -66,15 +66,12 @@ router.get("/stripe/revenue", async (req, res): Promise<void> => {
   }
 });
 
-router.get("/stripe/subscriptions", async (req, res): Promise<void> => {
+router.get("/stripe/subscriptions", requireAuth, async (req, res): Promise<void> => {
   const stripe = await getStripeClient();
 
   if (!stripe) {
-    res.json([
-      { id: "sub_demo1", customer: "Jordan@dreamco.ai", plan: "PRO", status: "active", amount: 49, currency: "usd", currentPeriodEnd: new Date(Date.now() + 15 * 86400000).toISOString() },
-      { id: "sub_demo2", customer: "client@example.com", plan: "ENTERPRISE", status: "active", amount: 299, currency: "usd", currentPeriodEnd: new Date(Date.now() + 22 * 86400000).toISOString() },
-      { id: "sub_demo3", customer: "user2@example.com", plan: "PRO", status: "active", amount: 49, currency: "usd", currentPeriodEnd: new Date(Date.now() + 8 * 86400000).toISOString() },
-    ]);
+    // Honest: no Stripe key => no subscriptions to report.
+    res.json([]);
     return;
   }
 
@@ -106,17 +103,12 @@ router.get("/stripe/subscriptions", async (req, res): Promise<void> => {
   }
 });
 
-router.get("/stripe/transactions", async (req, res): Promise<void> => {
+router.get("/stripe/transactions", requireAuth, async (req, res): Promise<void> => {
   const stripe = await getStripeClient();
 
   if (!stripe) {
-    const demos = [
-      { id: "ch_demo1", amount: 299, currency: "usd", status: "succeeded", description: "Enterprise subscription", date: new Date(Date.now() - 3600000).toISOString() },
-      { id: "ch_demo2", amount: 49, currency: "usd", status: "succeeded", description: "Pro subscription", date: new Date(Date.now() - 86400000).toISOString() },
-      { id: "ch_demo3", amount: 49, currency: "usd", status: "succeeded", description: "Pro subscription", date: new Date(Date.now() - 172800000).toISOString() },
-      { id: "ch_demo4", amount: 5, currency: "usd", status: "succeeded", description: "Token pack — 500 tokens", date: new Date(Date.now() - 259200000).toISOString() },
-    ];
-    res.json(demos);
+    // Honest: no Stripe key => no transactions to report.
+    res.json([]);
     return;
   }
 
@@ -138,7 +130,7 @@ router.get("/stripe/transactions", async (req, res): Promise<void> => {
   }
 });
 
-router.post("/stripe/checkout", async (req, res): Promise<void> => {
+router.post("/stripe/checkout", requireAuth, async (req, res): Promise<void> => {
   const stripe = await getStripeClient();
   if (!stripe) {
     res.status(503).json({ error: "Stripe not configured. Add STRIPE_SECRET_KEY." });

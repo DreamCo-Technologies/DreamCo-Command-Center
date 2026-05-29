@@ -13,3 +13,4 @@ export * from "./snapshots";
 export * from "./ai_sources";
 export * from "./buddy_notes";
 export * from "./quantum_providers";
+export * from "./media_jobs";
