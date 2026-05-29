@@ -32,6 +32,8 @@ import TimeCapsulePage from "@/pages/time-capsule";
 import CostsPage from "@/pages/costs";
 import AutonomyPage from "@/pages/autonomy";
 import SourcesPage from "@/pages/sources";
+import MemoryPage from "@/pages/memory";
+import QuantumPage from "@/pages/quantum";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -77,6 +79,8 @@ function Router() {
         <Route path="/time-capsule" component={TimeCapsulePage} />
         <Route path="/sources" component={SourcesPage} />
         <Route path="/ai-sources" component={SourcesPage} />
+        <Route path="/memory" component={MemoryPage} />
+        <Route path="/quantum" component={QuantumPage} />
         <Route path="/costs" component={CostsPage} />
         <Route path="/autonomy" component={AutonomyPage} />
         <Route component={NotFound} />

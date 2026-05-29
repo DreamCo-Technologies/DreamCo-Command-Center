@@ -12,6 +12,8 @@ import vibeRouter from "./vibe";
 import buddyCapabilitiesRouter from "./buddyCapabilities";
 import snapshotsRouter from "./snapshots";
 import sourcesRouter from "./sources";
+import memoryRouter from "./memory";
+import quantumRouter from "./quantum";
 
 const router: IRouter = Router();
 
@@ -28,5 +30,7 @@ router.use(vibeRouter);
 router.use(buddyCapabilitiesRouter);
 router.use(snapshotsRouter);
 router.use(sourcesRouter);
+router.use(memoryRouter);
+router.use(quantumRouter);
 
 export default router;

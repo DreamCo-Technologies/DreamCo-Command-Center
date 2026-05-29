@@ -1,8 +1,8 @@
 import { Router, type IRouter } from "express";
 import { randomUUID } from "crypto";
 import { logger } from "../lib/logger";
-import { db, aiSourcesTable } from "@workspace/db";
-import { desc } from "drizzle-orm";
+import { db, aiSourcesTable, buddyNotesTable } from "@workspace/db";
+import { desc, eq } from "drizzle-orm";
 
 const router: IRouter = Router();
 
@@ -45,6 +45,56 @@ async function buildSourcesContext(): Promise<string> {
   return text;
 }
 
+// Buddy's persistent memory (notes/learnings/guidance) injected back into its
+// context so it actually remembers across sessions. Cached briefly.
+let memoryCache: { at: number; userId: string; text: string } | null = null;
+const MEMORY_TTL_MS = 60_000;
+
+// Memory is private per user, so we cache per userId.
+async function buildMemoryContext(userId: string): Promise<string> {
+  const cached = memoryCache;
+  if (cached && cached.userId === userId && Date.now() - cached.at < MEMORY_TTL_MS) return cached.text;
+  let text = "";
+  try {
+    const rows = await db
+      .select({ category: buddyNotesTable.category, content: buddyNotesTable.content, source: buddyNotesTable.source })
+      .from(buddyNotesTable)
+      .where(eq(buddyNotesTable.userId, userId))
+      .orderBy(desc(buddyNotesTable.createdAt))
+      .limit(25);
+    if (rows.length > 0) {
+      const lines = rows.map((r) => `  - [${r.category}/${r.source}] ${r.content}`);
+      text = `\n\nYOUR PERSISTENT MEMORY (notes you and the human have saved — treat these as remembered facts and honor any guidance/preferences here):\n${lines.join("\n")}`;
+    }
+  } catch (err) {
+    logger.warn({ err }, "could not load Buddy memory");
+  }
+  memoryCache = { at: Date.now(), userId, text };
+  return text;
+}
+
+// When an AUTHENTICATED user explicitly asks Buddy to remember something,
+// persist it as a human-sourced note scoped to that user. Returns true if
+// captured. Unauthenticated callers never write to the DB.
+const REMEMBER_RE = /\b(remember|note that|don'?t forget|keep in mind|make a note)\b/i;
+async function maybeCaptureNote(message: string, sessionId: string, userId: string | undefined): Promise<boolean> {
+  if (!userId || !REMEMBER_RE.test(message)) return false;
+  try {
+    await db.insert(buddyNotesTable).values({
+      userId,
+      category: "preference",
+      content: message.slice(0, 4000),
+      source: "human",
+      sessionId,
+    });
+    memoryCache = null; // invalidate so it's reflected immediately
+    return true;
+  } catch (err) {
+    logger.warn({ err }, "could not capture Buddy note");
+    return false;
+  }
+}
+
 // In-memory chat history (per session)
 const sessions = new Map<string, Array<{ id: string; role: string; content: string; timestamp: string; emotion: string | null }>>();
 
@@ -84,13 +134,14 @@ OPERATIONAL FACTS:
 
 PERSONALITY: Calm authority with warmth — Jarvis-style. Be precise, name specific bots/endpoints when relevant, and always give actionable next steps. Never invent metrics — if you don't have live data, say so and point to the endpoint that has it.`;
 
-async function callAI(messages: Array<{ role: string; content: string }>): Promise<string> {
+async function callAI(messages: Array<{ role: string; content: string }>, userId: string | undefined): Promise<string> {
   const baseUrl = process.env.AI_INTEGRATIONS_OPENAI_BASE_URL;
   const apiKey = process.env.AI_INTEGRATIONS_OPENAI_API_KEY;
 
   if (baseUrl && apiKey) {
     try {
       const sourcesContext = await buildSourcesContext();
+      const memoryContext = userId ? await buildMemoryContext(userId) : "";
       const res = await fetch(`${baseUrl}/chat/completions`, {
         method: "POST",
         headers: {
@@ -99,7 +150,7 @@ async function callAI(messages: Array<{ role: string; content: string }>): Promi
         },
         body: JSON.stringify({
           model: "gpt-5-mini",
-          messages: [{ role: "system", content: BUDDY_SYSTEM_PROMPT + sourcesContext }, ...messages],
+          messages: [{ role: "system", content: BUDDY_SYSTEM_PROMPT + sourcesContext + memoryContext }, ...messages],
           max_tokens: 800,
           temperature: 0.7,
         }),
@@ -173,10 +224,13 @@ router.post("/buddy/chat", async (req, res): Promise<void> => {
   };
   history.push(userMsg);
 
+  const userId = req.user?.id;
+  const noteCaptured = await maybeCaptureNote(message, sid, userId);
+
   const messages = history.slice(-10).map((m) => ({ role: m.role, content: m.content }));
 
   try {
-    const reply = await callAI(messages);
+    const reply = await callAI(messages, userId);
     const buddyMsg = {
       id: randomUUID(),
       role: "buddy",
@@ -191,6 +245,7 @@ router.post("/buddy/chat", async (req, res): Promise<void> => {
       sessionId: sid,
       timestamp: buddyMsg.timestamp,
       emotion: buddyMsg.emotion,
+      noteCaptured,
     });
   } catch (err) {
     req.log.error({ err }, "Buddy chat error");

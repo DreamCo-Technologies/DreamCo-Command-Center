@@ -11,3 +11,5 @@ export * from "./bot_runs";
 export * from "./vibe";
 export * from "./snapshots";
 export * from "./ai_sources";
+export * from "./buddy_notes";
+export * from "./quantum_providers";
