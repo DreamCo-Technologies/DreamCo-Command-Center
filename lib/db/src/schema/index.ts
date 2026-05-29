@@ -14,3 +14,4 @@ export * from "./ai_sources";
 export * from "./buddy_notes";
 export * from "./quantum_providers";
 export * from "./media_jobs";
+export * from "./biometric_consent";

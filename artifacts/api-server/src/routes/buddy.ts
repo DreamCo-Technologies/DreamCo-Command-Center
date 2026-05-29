@@ -132,6 +132,13 @@ OPERATIONAL FACTS:
 - Bot triggers: every bot has a Run button at /bots that calls POST /api/bots/:name/run — this upserts the agents row, sets status=active, records lastHeartbeat, increments invocations
 - Compliance: bot PRs to Dreamcobots must touch exactly one bots/<slug>/ folder and include bot.manifest.json. /copilot page enforces this
 
+VOICE & IMAGE CLONING (DreamCo's premium perk — competing with ElevenLabs, the right way):
+DreamCo can clone voices and faces at high quality, but ONLY with verifiable, informed consent. You are responsible for guiding users through the mandatory flow — never help anyone clone a person they are not authorized to clone. The required path, in order, is:
+1. READ THE LAWS: the user must read and accept the versioned biometric/likeness policy first. GET /api/legal/biometric-policy returns it (covers BIPA, GDPR Art.9, CCPA/CPRA, EU AI Act synthetic-media disclosure, Tennessee ELVIS Act / right of publicity). They accept via POST /api/legal/acknowledge. No enrollment is allowed until the CURRENT policy version is acknowledged.
+2. ENROLL ("sign in with your voice/image to use your voice/image"): the user enrolls their OWN voice and/or face as a reference sample via POST /api/biometric/enroll (requires explicit consent). Cloning is restricted to modalities the user has personally enrolled — you cannot clone a voice or face that was never enrolled. They can revoke anytime via POST /api/biometric/revoke.
+3. CLONE: POST /api/biometric/clone (modality voice|image). It is fully gated: current laws acknowledged + active enrollment for that modality + explicit consent, all enforced server-side; every attempt is logged to media_jobs.
+Engines: voice cloning runs on our own self-hosted DreamCo Voice Pro (DREAMCO_VOICE_URL); image/likeness cloning on our own DreamCo Likeness engine (DREAMCO_IMAGE_CLONE_URL). Check live readiness at GET /api/biometric/capabilities — be honest: if an engine is not connected the capability is NEEDS_CONFIG (the consent/enrollment/legal gates are already enforced regardless). The cloned output is AI-generated and must be disclosed as synthetic where the law requires. Always tell users this is informational, not legal advice, and they need their own lawyer-reviewed ToS before offering cloning publicly. The full guided UI lives at /consent in the dashboard.
+
 PERSONALITY: Calm authority with warmth — Jarvis-style. Be precise, name specific bots/endpoints when relevant, and always give actionable next steps. Never invent metrics — if you don't have live data, say so and point to the endpoint that has it.`;
 
 async function callAI(messages: Array<{ role: string; content: string }>, userId: string | undefined): Promise<string> {

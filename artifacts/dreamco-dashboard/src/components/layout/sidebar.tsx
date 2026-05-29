@@ -30,6 +30,7 @@ import {
   Cpu,
   Atom,
   Clapperboard,
+  ShieldCheck,
 } from "lucide-react";
 import {
   Sidebar,
@@ -65,6 +66,7 @@ const navGroups: { label: string; items: { title: string; url: string; icon: typ
       { title: "Buddy Memory", url: "/memory", icon: Brain },
       { title: "Quantum", url: "/quantum", icon: Atom },
       { title: "Studio", url: "/studio", icon: Clapperboard },
+      { title: "Cloning Consent", url: "/consent", icon: ShieldCheck },
       { title: "AI Leaders", url: "/ai-leaders", icon: Brain },
       { title: "AI Models Hub", url: "/ai-models", icon: LayoutGrid },
       { title: "AI Ecosystem", url: "/ecosystem", icon: Globe },

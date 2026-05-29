@@ -66,6 +66,16 @@ function hasElevenLabs(): boolean {
 function hasVoice(): boolean {
   return hasSelfHostedVoice() || hasElevenLabs();
 }
+// DreamCo Clone Studio: our own self-hosted neural cloning engines (owned, not a
+// competitor API). Voice cloning reuses the DreamCo Voice Pro engine; image /
+// likeness cloning uses a dedicated self-hosted service. Each goes LIVE only
+// when its engine URL is configured — we never report "live" on intent alone.
+function hasVoiceCloneEngine(): boolean {
+  return !!process.env.DREAMCO_VOICE_URL;
+}
+function hasImageCloneEngine(): boolean {
+  return !!process.env.DREAMCO_IMAGE_CLONE_URL;
+}
 function hasMusic(): boolean {
   return !!process.env.SUNO_API_KEY;
 }
@@ -151,6 +161,104 @@ export function getCapability(kind: MediaKind): Capability {
   const cap = getCapabilities().find((c) => c.kind === kind);
   if (!cap) throw new Error(`unknown media kind: ${kind}`);
   return cap;
+}
+
+export type CloneModality = "voice" | "image";
+
+export interface CloneCapability {
+  modality: CloneModality;
+  status: CapabilityStatus;
+  provider: string;
+  envVar: string;
+  note: string;
+}
+
+/**
+ * Cloning capabilities (DreamCo's competing-with-ElevenLabs perk). System-level
+ * engine readiness only — per-user authorization (consent, legal acknowledgment,
+ * enrollment) is enforced separately in the route layer. Honest: status is
+ * needs_config until the self-hosted clone engine URL is connected; we never
+ * fabricate the neural model.
+ */
+export function getCloneCapabilities(): CloneCapability[] {
+  return [
+    {
+      modality: "voice",
+      status: hasVoiceCloneEngine() ? "live" : "needs_config",
+      provider: "DreamCo Voice Pro (self-hosted)",
+      envVar: "DREAMCO_VOICE_URL",
+      note: hasVoiceCloneEngine()
+        ? "Live. Voice cloning runs on our own self-hosted DreamCo Voice Pro engine. Requires the speaker's enrolled, consented voice sample."
+        : "Voice cloning engine not connected. Set DREAMCO_VOICE_URL to your self-hosted DreamCo Voice Pro engine to go live. Enrollment + consent + legal acknowledgment are already enforced.",
+    },
+    {
+      modality: "image",
+      status: hasImageCloneEngine() ? "live" : "needs_config",
+      provider: "DreamCo Likeness (self-hosted)",
+      envVar: "DREAMCO_IMAGE_CLONE_URL",
+      note: hasImageCloneEngine()
+        ? "Live. Likeness/image cloning runs on our own self-hosted engine. Requires the person's enrolled, consented image sample."
+        : "Image/likeness cloning engine not connected. Set DREAMCO_IMAGE_CLONE_URL to your self-hosted engine to go live. Enrollment + consent + legal acknowledgment are already enforced.",
+    },
+  ];
+}
+
+export function getCloneCapability(modality: CloneModality): CloneCapability {
+  const cap = getCloneCapabilities().find((c) => c.modality === modality);
+  if (!cap) throw new Error(`unknown clone modality: ${modality}`);
+  return cap;
+}
+
+/**
+ * Run a clone generation against the self-hosted engine for the modality.
+ * Throws NeedsKeyError when the engine is not connected (honest needs_config),
+ * so the route records the attempt and returns a truthful 503 instead of faking
+ * output. `sampleRef` references the requesting user's own enrolled sample.
+ */
+export async function generateClone(
+  modality: CloneModality,
+  prompt: string,
+  sampleRef: string,
+  params: Record<string, unknown> = {},
+): Promise<GenerateResult> {
+  // Strip any client-supplied binding fields. The sample reference is derived
+  // strictly from the caller's active enrollment and must NEVER be overridable
+  // by request params — otherwise a user with one enrollment could clone a
+  // voice/likeness they never enrolled (consent bypass / IDOR).
+  const safeParams: Record<string, unknown> = { ...params };
+  delete safeParams.sampleRef;
+  delete safeParams.voice;
+  delete safeParams.voiceId;
+
+  if (modality === "voice") {
+    const url = process.env.DREAMCO_VOICE_URL;
+    if (!url) throw new NeedsKeyError("voice", "DREAMCO_VOICE_URL", "DreamCo Voice Pro (self-hosted)");
+    return generateVoice(prompt, { ...safeParams, voiceId: sampleRef, clone: true });
+  }
+  const url = process.env.DREAMCO_IMAGE_CLONE_URL;
+  if (!url) throw new NeedsKeyError("image", "DREAMCO_IMAGE_CLONE_URL", "DreamCo Likeness (self-hosted)");
+  const headers: Record<string, string> = { "content-type": "application/json" };
+  if (process.env.DREAMCO_IMAGE_CLONE_API_KEY) headers.authorization = `Bearer ${process.env.DREAMCO_IMAGE_CLONE_API_KEY}`;
+  const res = await fetch(url, {
+    method: "POST",
+    headers,
+    // sampleRef placed AFTER the spread so client params cannot override it.
+    body: JSON.stringify({ prompt, ...safeParams, sampleRef }),
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(`DreamCo Likeness error ${res.status}: ${text.slice(0, 300)}`);
+  }
+  const ct = res.headers.get("content-type") ?? "";
+  if (ct.includes("application/json")) {
+    const j = (await res.json()) as { url?: string; image?: string; imageBase64?: string; format?: string };
+    if (j.url) return { provider: "DreamCo Likeness (self-hosted)", resultUrl: j.url };
+    const b64 = j.image ?? j.imageBase64;
+    if (b64) return { provider: "DreamCo Likeness (self-hosted)", resultUrl: `data:image/${j.format ?? "png"};base64,${b64}` };
+    throw new Error("DreamCo Likeness returned no image");
+  }
+  const buf = Buffer.from(await res.arrayBuffer());
+  return { provider: "DreamCo Likeness (self-hosted)", resultUrl: `data:${ct || "image/png"};base64,${buf.toString("base64")}`, meta: { bytes: buf.length } };
 }
 
 export interface GenerateResult {

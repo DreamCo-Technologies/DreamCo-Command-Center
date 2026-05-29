@@ -35,6 +35,7 @@ import SourcesPage from "@/pages/sources";
 import MemoryPage from "@/pages/memory";
 import QuantumPage from "@/pages/quantum";
 import StudioPage from "@/pages/studio";
+import ConsentPage from "@/pages/consent";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -84,6 +85,8 @@ function Router() {
         <Route path="/quantum" component={QuantumPage} />
         <Route path="/studio" component={StudioPage} />
         <Route path="/media" component={StudioPage} />
+        <Route path="/consent" component={ConsentPage} />
+        <Route path="/cloning" component={ConsentPage} />
         <Route path="/costs" component={CostsPage} />
         <Route path="/autonomy" component={AutonomyPage} />
         <Route component={NotFound} />

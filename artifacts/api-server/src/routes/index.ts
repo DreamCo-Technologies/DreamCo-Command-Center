@@ -15,6 +15,7 @@ import sourcesRouter from "./sources";
 import memoryRouter from "./memory";
 import quantumRouter from "./quantum";
 import mediaRouter from "./media";
+import biometricRouter from "./biometric";
 
 const router: IRouter = Router();
 
@@ -34,5 +35,6 @@ router.use(sourcesRouter);
 router.use(memoryRouter);
 router.use(quantumRouter);
 router.use(mediaRouter);
+router.use(biometricRouter);
 
 export default router;
